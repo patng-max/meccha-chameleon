@@ -81,6 +81,54 @@
 
 ---
 
+## Milestone 2/3b: Staging Deployment
+
+**Status:** Planned (part of M2/3 scope — infrastructure before M4/M5 media uploads).
+
+**What ships:**
+- `GET /api/health` route — returns non-secret JSON with status, environment name, timestamp
+- Next.js `output: "standalone"` in `next.config.ts`
+- `scripts/deploy/package-standalone.sh` — packages `.next/standalone` + `public` + `.next/static`
+- `scripts/deploy/staging-install.sh` — upload, unpack, symlink switch, systemd restart, health check, auto-rollback on failure
+- `scripts/deploy/staging-rollback.sh` — explicit operator rollback to previous or specified release
+- `deploy/staging/meccha-chameleon-staging.service` — systemd unit template
+- `deploy/staging/nginx-meccha-chameleon-staging.conf` — Nginx vhost template for `meccha-staging.amfbss.com`
+- `.github/workflows/staging.yml` — CI gates + artifact build + SCP deploy + health verification
+- `docs/runbooks/staging-deployment.md` — VPS setup, DNS/TLS checklist, deploy, rollback, logs, troubleshooting
+- VPS directory structure: `/opt/meccha-chameleon/staging/releases/<ts>-<sha>/`, `/opt/meccha-chameleon/staging/current` symlink
+- Persistent media dirs: `/srv/meccha-chameleon-staging/media/public/clues/`, `/srv/meccha-chameleon-staging/media/private/proofs/`
+- Supabase staging project (`rquntpbnpvslnnjzaaxd`) OAuth redirect URL for `https://meccha-staging.amfbss.com/auth/callback`
+
+**Acceptance criteria:**
+- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all pass in CI before deploy
+- [ ] GitHub Actions deploys staging automatically on push to `main` (no manual SSH)
+- [ ] `https://meccha-chameleon-staging.amfbss.com/api/health` returns HTTP 200 with non-secret JSON
+- [ ] systemd service `meccha-chameleon-staging.service` is enabled and running
+- [ ] App binds only to `127.0.0.1:4201` (localhost)
+- [ ] Nginx proxies HTTPS traffic to the app on port 4201
+- [ ] `/srv/meccha-chameleon-staging/media/public/clues/` is served as static files via Nginx
+- [ ] `/srv/meccha-chameleon-staging/media/private/proofs/` is NOT accessible as a static URL (404)
+- [ ] Failed deploy leaves previous release running (symlink untouched)
+- [ ] Rollback to previous release is tested and documented
+- [ ] Health response contains no secrets, coordinates, or internal file paths
+
+**Risks:**
+- ADR-005 still says Docker for staging — ADR-010 supersedes this; Docker deferred to production deployment milestone
+- Next.js standalone requires `public` and `.next/static` to be copied manually (handled in package script)
+- VPS Node version (v22.22.2 via nvm) must match CI Node version — enforced by `nvm`
+
+**Dependencies:**
+- VPS deploy user with SSH key authorized for non-interactive GitHub Actions SCP/SSH
+- Cloudflare proxied DNS record for `meccha-staging.amfbss.com`
+- Cloudflare origin certificate installed on VPS before enabling Full strict TLS
+- Staging Supabase project with OAuth callback URL configured
+
+**Gstack planning artifacts:** `docs/gstack/meccha-staging-office-hours.md`, `docs/gstack/meccha-staging-ceo-review.md`, `docs/gstack/meccha-staging-eng-review.md`
+
+**Supersedes:** ADR-005 staging parts (`staging.taiwan-way.co.uk`, Docker-based staging).
+
+---
+
 ## Milestone 4: Hider Deployment Flow with Moderation
 
 **What ships:**

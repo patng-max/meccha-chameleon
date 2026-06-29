@@ -220,6 +220,45 @@ If any of the above returns unexpected results, investigate before committing.
 
 ---
 
+## Deployment Rules
+
+### Immutable release model
+
+- **Deploy from artifact, not git checkout.** Artifacts are built in GitHub Actions, uploaded to VPS via SCP, and unpacked into timestamped release directories under `/opt/meccha-chameleon/staging/releases/<timestamp>-<sha>/`.
+- Never run `git clone` or `git pull` on the VPS as a deployment mechanism.
+- The `current` symlink is the only pointer to the active release. Switch it atomically.
+
+### Secrets on VPS only
+
+- `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, and any future server-only secrets live ONLY in `/opt/meccha-chameleon/staging/shared/.env.production` on the VPS.
+- These files must NEVER be in the release artifact or committed to GitHub.
+- Browser-safe values (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`) may be in the artifact because they are already public-facing.
+
+### Migrations are Arch-controlled
+
+- Database migrations are separate from application deployments.
+- Never mix migration runs into the deploy script. Run them before or after deploy, separately.
+- Always test migrations on staging Supabase before applying to production.
+
+### Media paths are immutable per environment
+
+- Staging: `/srv/meccha-chameleon-staging/media/`
+- Production: `/srv/meccha-chameleon/media/`
+- Media directories are NEVER inside release directories (`/opt/meccha-chameleon/`).
+- Media directories are NEVER rolled back with app releases.
+
+### Rollback is automatic on local failure
+
+- `staging-install.sh` must automatically restore the previous `current` symlink if local health fails after a symlink switch.
+- Explicit rollback via `staging-rollback.sh` is for operator use only.
+
+### No Docker for staging
+
+- Staging uses systemd + immutable releases. Docker is deferred to the production deployment milestone.
+- This is per ADR-010, not a temporary choice.
+
+---
+
 ## Getting Help
 
 - **Architecture questions** → read `docs/architecture.md`

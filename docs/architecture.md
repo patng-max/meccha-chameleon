@@ -403,3 +403,107 @@ Migration `002_m2_m3_player_onboarding_territory.sql` seeded the `territory_cell
 ### Consequences
 - Existing territory data in any environment running migration 002 must be re-seeded with migration 003.
 - Map rendering will show 6 unclaimed Reading cells — no faction colours until M4 hide deployment.
+
+---
+
+## ADR-010: Staging Deployment (Supersedes ADR-005 Staging Parts)
+
+### Status
+Accepted.
+
+### Decision
+
+**Supersedes:** the staging-related parts of ADR-005. ADR-005 production deployment intent (Docker) is preserved for future production implementation.
+
+**Deployment model:** immutable release directories + systemd service + Nginx reverse proxy + Cloudflare DNS/TLS. No Docker for staging.
+
+#### Paths
+
+| Path | Purpose |
+|------|---------|
+| `/opt/meccha-chameleon/staging/releases/<timestamp>-<sha>/` | Individual immutable release directories |
+| `/opt/meccha-chameleon/staging/current` | Atomic symlink pointing to active release |
+| `/opt/meccha-chameleon/staging/shared/.env.production` | Runtime environment file (VPS-only, not in artifact) |
+| `/srv/meccha-chameleon-staging/media/public/clues/` | Public clue photos (static Nginx) |
+| `/srv/meccha-chameleon-staging/media/private/proofs/` | Private proof photos (authenticated app routes only) |
+
+#### Systemd service
+
+- Service name: `meccha-chameleon-staging.service`
+- App binds to: `127.0.0.1:4201` (localhost only — Nginx is the public-facing proxy)
+- Working directory: `/opt/meccha-chameleon/staging/current`
+- Environment file: `/opt/meccha-chameleon/staging/shared/.env.production`
+- Restart policy: `Restart=on-failure`, `RestartSec=5`
+- Hardening: `User=deploy`, `NoNewPrivileges=true`, `PrivateTmp=true`
+
+#### Nginx contract
+
+- `server_name meccha-staging.amfbss.com`
+- Proxies to `127.0.0.1:4201`
+- Serves `/srv/meccha-chameleon-staging/media/public/` at `/media/public/` with `Cache-Control: public, max-age=31536000, immutable`
+- Explicitly does NOT serve `/media/private/` as static files
+- Preserves `Host`, `X-Forwarded-Proto`, `X-Forwarded-For`
+
+#### Cloudflare contract
+
+- Proxied A record for `meccha-staging.amfbss.com`
+- SSL/TLS mode: Full (strict)
+- Always Use HTTPS: enabled
+- Public clue media: cached at edge (immutable URL strategy)
+- Private proof media: bypass cache entirely (`Cache-Control: private, no-store`)
+
+#### Release pipeline
+
+```
+push to main
+    │
+    ▼
+CI: lint → typecheck → test → build
+    │
+    ▼
+Package: standalone artifact (next build) + public + .next/static
+    │
+    ▼
+SCP artifact → VPS /tmp/<release-id>.tar.gz
+    │
+    ▼
+staging-install.sh <release-id>
+    │
+    ├── create /opt/meccha-chameleon/staging/releases/<release-id>/
+    ├── unpack artifact
+    ├── validate server.js + static assets
+    ├── ensure /srv/ media dirs exist
+    ├── atomic symlink switch: current → new release
+    ├── systemctl restart meccha-chameleon-staging.service
+    ├── local health: http://127.0.0.1:4201/api/health
+    ├── external health: https://meccha-staging.amfbss.com/api/health
+    │
+    ├── success: done
+    │
+    └── failure: restore previous current → restart previous → report
+```
+
+#### Secrets model
+
+| Secret | Location | In artifact? |
+|--------|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | GitHub Actions env + runtime env | Yes (browser-safe) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | GitHub Actions env + runtime env | Yes (browser-safe) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | GitHub Actions env + runtime env | Yes (browser-safe) |
+| `SUPABASE_SERVICE_ROLE_KEY` | VPS file only | No |
+| `TURNSTILE_SECRET_KEY` | VPS file only | No |
+| SSH deploy key | GitHub Actions secrets | Never touches artifact |
+
+#### Rollback
+
+- `staging-install.sh` performs automatic rollback on local health failure
+- `staging-rollback.sh [previous|<release-id>]` for explicit operator rollback
+- Media directories are NEVER rolled back with app releases
+- Release pruning: keep the 5 most recent successful releases
+
+### Consequences
+
+- ADR-005 staging hostname (`staging.taiwan-way.co.uk`) is replaced by `meccha-staging.amfbss.com`
+- ADR-005 Docker-based staging intent is replaced by systemd + immutable releases for staging
+- Production deployment (Docker) is deferred to a separate production deployment milestone
+- Staging is isolated from production: separate Supabase project, separate media paths, separate secrets
