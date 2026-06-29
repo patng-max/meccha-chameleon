@@ -1,0 +1,36 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 0 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.authButton {
+  min-height: 36px;
+  border: 1px solid rgba(226, 232, 240, 0.22);
+  border-radius: 8px;
+  padding: 0 0.9rem;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.authButton:hover {
+  background: #e2e8f0;
+}

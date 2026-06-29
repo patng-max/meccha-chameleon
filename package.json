@@ -9,11 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.87.1",
+    "exifreader": "^4.32.0",
+    "h3-js": "^4.3.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sharp": "^0.34.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/exifreader": "^4.13.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

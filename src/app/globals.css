@@ -1,6 +1,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --faction-verdant: #15803d;
+  --faction-ember: #c2410c;
+  --faction-tide: #0369a1;
+  --faction-verdant-soft: #dcfce7;
+  --faction-ember-soft: #ffedd5;
+  --faction-tide-soft: #e0f2fe;
 }
 
 @media (prefers-color-scheme: dark) {
