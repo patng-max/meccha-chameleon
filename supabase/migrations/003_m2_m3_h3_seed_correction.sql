@@ -58,8 +58,13 @@ VALUES
 -- ── Step 4: Minimise public_player_profiles — remove created_at ─────────────
 -- created_at is not needed by any M2/3 feature and is removed to minimise
 -- exposed player data surface.
-CREATE OR REPLACE VIEW public.public_player_profiles AS
+-- Cannot DROP COLUMN on view; must DROP and recreate.
+DROP VIEW IF EXISTS public.public_player_profiles;
+CREATE VIEW public.public_player_profiles AS
   SELECT id, faction, display_name
   FROM public.players;
+
+-- Re-grant read access to anon and authenticated roles
+GRANT SELECT ON public.public_player_profiles TO authenticated, anon;
 
 COMMIT;
