@@ -192,6 +192,19 @@ All tables in `supabase/migrations/001_initial_schema.sql`:
 - Rate limiting at Cloudflare layer on auth endpoints (GitHub OAuth callback)
 - Supabase Auth rate limits on email/password (if enabled)
 
+### Turnstile scope — M2/3 clarification
+> **Turnstile is not implemented for the authenticated onboarding route (M2/3).**
+>
+> The onboarding route (`POST /api/player/onboard`) is called by an already-authenticated user (GitHub OAuth session established). The OAuth session itself provides identity verification — there is no unauthenticated actor to challenge at this step.
+>
+> Turnstile **is mandatory** before public or abuse-prone mutations where identity is not pre-established:
+> - Hide submissions (unauthenticated or low-reputation actors may abuse)
+> - Proof submissions
+> - Player reports
+> - Any unauthenticated form submission
+>
+> See ADR-003 and ADR-006 for full Turnstile architecture.
+
 ### Submission Flooding
 - Rate limit: maximum 10 hide submissions per player per hour (enforced at API route level)
 - Duplicate detection: if a player submits a hide with the same H3 cell + codename within 24h, flag for review

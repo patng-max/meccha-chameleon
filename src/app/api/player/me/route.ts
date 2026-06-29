@@ -34,7 +34,6 @@ export async function GET() {
       id: player.id,
       displayName: player.display_name,
       faction: player.faction,
-      createdAt: player.created_at,
     },
   };
 

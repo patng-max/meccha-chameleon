@@ -123,7 +123,7 @@ export function TerritoryMap({ cells }: TerritoryMapProps) {
                 Found this territory
               </button>
               <p style="margin: 6px 0 0; font-size: 11px; color: #6b7280; text-align: center;">
-                Coming soon: deploy a scout
+                Scout deployment opens in the next game phase.
               </p>
             ` : ""}
           </div>
@@ -139,7 +139,7 @@ export function TerritoryMap({ cells }: TerritoryMapProps) {
               const btn = div.querySelector("#found-cell-btn");
               if (btn) {
                 btn.addEventListener("click", () => {
-                  alert("Hide deployment will be available in Milestone 4.");
+                  alert("Scout deployment opens in the next game phase. Hide deployment comes in a later milestone.");
                 });
               }
               return div;

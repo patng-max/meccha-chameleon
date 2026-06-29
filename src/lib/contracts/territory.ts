@@ -75,7 +75,6 @@ export type PlayerMeResponse =
         id: string;
         displayName: string;
         faction: FactionId;
-        createdAt: string;
       };
     };
 
@@ -95,7 +94,6 @@ export interface DashboardResponse {
     id: string;
     displayName: string;
     faction: FactionId;
-    createdAt: string;
   };
   factions: FactionStanding[];
   map: {

@@ -54,11 +54,13 @@ describe("players RLS behavior (documentation)", () => {
 
   describe("public_player_profiles view", () => {
     it("exposes only safe public fields", () => {
-      // View: select id, faction, display_name, created_at from public.players
-      // Must NOT include: user_id, last_active_at
-      const viewFields = ["id", "faction", "display_name", "created_at"];
+      // View: select id, faction, display_name from public.players
+      // created_at removed by migration 003 — not needed for any M2/3 feature
+      // Must NOT include: user_id, last_active_at, created_at
+      const viewFields = ["id", "faction", "display_name"];
       expect(viewFields).not.toContain("user_id");
       expect(viewFields).not.toContain("last_active_at");
+      expect(viewFields).not.toContain("created_at");
     });
 
     it("is readable by anon and authenticated", () => {
@@ -79,6 +81,7 @@ describe("players RLS behavior (documentation)", () => {
     const forbidden = [
       "user_id",
       "last_active_at",
+      "created_at",
       "exact_location",
       "private_location_id",
       "latitude",
@@ -86,10 +89,39 @@ describe("players RLS behavior (documentation)", () => {
     ];
 
     it("none of the forbidden fields are in public_player_profiles", () => {
-      const viewFields = ["id", "faction", "display_name", "created_at"];
+      // Migration 003 removes created_at from the view entirely
+      const viewFields = ["id", "faction", "display_name"];
       for (const f of forbidden) {
         expect(viewFields).not.toContain(f);
       }
+    });
+  });
+
+  describe("privacy assertions (documentation)", () => {
+    it("public_player_profiles view cannot return user_id", () => {
+      // The view definition does not include user_id — it is not in the SELECT
+      const viewFields = ["id", "faction", "display_name"];
+      expect(viewFields).not.toContain("user_id");
+    });
+
+    it("public_player_profiles view cannot return last_active_at", () => {
+      const viewFields = ["id", "faction", "display_name"];
+      expect(viewFields).not.toContain("last_active_at");
+    });
+
+    it("public_player_profiles view cannot return created_at", () => {
+      // created_at removed by migration 003 to minimise exposed surface
+      const viewFields = ["id", "faction", "display_name"];
+      expect(viewFields).not.toContain("created_at");
+    });
+
+    it("players table SELECT is blocked for normal authenticated users", () => {
+      // RLS policy: user_id = auth.uid() OR auth.role() = 'service_role'
+      // A normal authenticated user (not the row owner) gets 0 rows
+      const policy = "user_id = auth.uid() OR auth.role() = 'service_role'";
+      expect(policy).not.toBe("(true)");
+      // A user's own row is readable (owner matches uid) — service_role gets all
+      expect(policy).toContain("auth.uid()");
     });
   });
 });

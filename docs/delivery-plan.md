@@ -50,7 +50,7 @@
 - `territory_cells` table (materialized, seeded for Reading pilot)
 - MapLibre GL JS client-only territory map: H3 cell polygons, neutral/controlled/contested states, OpenFreeMap default
 - Correct H3→GeoJSON coordinate conversion: `[lat, lng]` → `[lng, lat]`, ring closure
-- Cell tap: safe public details (area label, status, controller, hide counts); unclaimed cells show "Found this territory" explanation
+- Cell tap: safe public details (area label, status, controller, hide counts); unclaimed cells show "Scout deployment opens in the next game phase" explanation
 - Vitest test foundation: H3→GeoJSON ordering, forbidden key leakage, onboarding schema, RLS boundaries
 - Playwright skeleton: redirect tests, public page render, API privacy check
 
@@ -61,8 +61,9 @@
 - [ ] Public map API payloads contain no exact coordinates or private_location identifiers
 - [ ] Public player data cannot expose user_id, last_active_at, or internal fields
 - [ ] `players` RLS locked; `public_player_profiles` view is the only public player data path
+- [ ] `public_player_profiles` view does not expose `created_at` (removed by migration 003)
 - [ ] Faction display names globally unique and case-insensitive
-- [ ] Unclaimed cells show "Found this territory" / "Coming soon" explanation
+- [ ] Unclaimed cells show "Scout deployment opens in the next game phase" explanation
 - [ ] Lint, type check, production build, and focused tests all pass
 
 **Risks:**
@@ -71,8 +72,12 @@
 - API returns raw Supabase rows with private_location_id — explicit DTO mapping, no table passthrough
 - h3-utils coordinate ordering wrong — `[lat,lng]` → `[lng,lat]` reversal fixed + unit tested
 - OAuth E2E blocks CI — unit-test mappers, skeleton Playwright, live OAuth deferred
+- H3 seed cells in migration 002 were res 9, not res 7 — fixed in migration 003
+- Fictional territory state (controlled/contested) in migration 002 — reset in migration 003
 
 **Gstack planning artifacts:** `docs/gstack/meccha-m2-office-hours.md`, `docs/gstack/meccha-m2-ceo-review.md`, `docs/gstack/meccha-m2-eng-review.md`
+
+> **Turnstile note:** Turnstile is not required on the authenticated onboarding route (M2/3). The GitHub OAuth session provides identity verification. Turnstile gates public/abuse-prone mutations (hide submissions, proof submissions, reports, unauthenticated forms) per ADR-006 and `docs/security-model.md`.
 
 ---
 

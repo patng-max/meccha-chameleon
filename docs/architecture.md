@@ -194,7 +194,7 @@ Proposed (architecture defined, deployment not yet implemented).
 ## ADR-006: Cloudflare Turnstile, DNS, Edge Protection
 
 ### Status
-Accepted.
+Accepted (Turnstile clarification: not required on authenticated onboarding route — see scope note below).
 
 ### Decision
 - **Bot protection:** Cloudflare Turnstile (invisible, privacy-friendly alternative to reCAPTCHA)
@@ -206,6 +206,9 @@ Accepted.
 
 ### DNS
 - Domain registrar: Cloudflare (nameservers set to Cloudflare)
+
+### Turnstile scope (M2/3 clarification)
+> Onboarding (`POST /api/player/onboard`) is **not** protected by Turnstile. The route is called by an already-authenticated user (GitHub OAuth session). Turnstile is mandatory only for routes where the submitting actor is unauthenticated or where abuse risk is high (hide submissions, proof submissions, reports, unauthenticated forms). This is documented in `docs/security-model.md`.
 - DNSSEC: enabled
 - SSL/TLS: Full (strict mode once certificates provisioned)
 - Always-on HTTPS (HSTS preloading)
@@ -358,3 +361,45 @@ Media backup is decoupled from application release management.
 - H3 index size: 15 hex chars — fits in a `text` column with index
 
 **Privacy note:** H3 cell boundaries are public (rendered on map). A cell at res 7 covers ~0.73 km² — the approximate area label further generalises location. This is the intended privacy trade-off.
+---
+
+## ADR-009: H3 Seed Cell Correction (M2/3 Patch)
+
+### Status
+Accepted (M2/3 correction, committed as migration `003_m2_m3_h3_seed_correction.sql`).
+
+### Context
+Migration `002_m2_m3_player_onboarding_territory.sql` seeded the `territory_cells` table with cells that were **not verified as resolution 7**. Most were resolution 9 (16 hex chars), not res 7 (15 hex chars). Additionally, the seed contained fictional "controlled" and "contested" territory with non-zero hide counts — dishonest data for a pre-play M2/3 milestone.
+
+### Decision
+1. **Delete all existing seed cells** and replace with cells verified as resolution 7 via `getResolution(cell) === 7` from `h3-js`.
+2. **Reset all cells to unclaimed** — `state = 'unclaimed'`, `controller_faction = NULL`, `active_hide_count = 0`, `contested_hide_count = 0`. No faction territory is invented.
+3. **Source coordinates are public landmarks only** (Reading town centre, Forbury Gardens, Reading Station, Caversham, Abbey Quarter, Oracle, Whitley, Tilehurst, South Reading) — no private addresses.
+4. **6 validated res 7 cells** inserted, covering Reading neighbourhoods. Cell identities are not sensitive — they represent ~0.73 km² areas.
+
+### Representative coordinates used (all public landmarks)
+| Area | Latitude | Longitude |
+|------|----------|-----------|
+| Reading Town Centre | 51.454 | −0.974 |
+| Forbury Gardens | 51.456 | −0.971 |
+| Reading Station | 51.4563 | −0.9638 |
+| Caversham | 51.465 | −0.968 |
+| Abbey Quarter | 51.459 | −0.978 |
+| Oracle | 51.452 | −0.969 |
+| Whitley | 51.444 | −0.985 |
+| Tilehurst | 51.464 | −1.008 |
+| South Reading | 51.438 | −0.975 |
+
+### Validated cells
+| H3 Cell | Area Label | Resolution | Source |
+|----------|-----------|-----------|--------|
+| `87195d2b1ffffff` | Reading Town Centre | 7 | lat 51.454, lng −0.974 |
+| `87195d2b5ffffff` | Caversham | 7 | lat 51.465, lng −0.968 |
+| `87195d2b0ffffff` | Abbey Quarter | 7 | lat 51.459, lng −0.978 |
+| `87195d2b3ffffff` | Whitley | 7 | lat 51.444, lng −0.985 |
+| `87195d2b2ffffff` | Tilehurst | 7 | lat 51.464, lng −1.008 |
+| `87195d2b6ffffff` | South Reading | 7 | lat 51.438, lng −0.975 |
+
+### Consequences
+- Existing territory data in any environment running migration 002 must be re-seeded with migration 003.
+- Map rendering will show 6 unclaimed Reading cells — no faction colours until M4 hide deployment.
