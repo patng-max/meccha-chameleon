@@ -35,47 +35,44 @@
 
 ---
 
-## Milestone 2: Factions + Player Identity + Auth Completion
+## Milestone 2/3: Player Identity, Factions & First Playable Territory Map ✅ IN PROGRESS
+
+**Status:** Merged from former M2 + M3. Combined to ship one coherent playable experience.
 
 **What ships:**
-- Player onboarding flow: sign in → select faction → set display name
-- Player profile page: faction badge, display name, owned hides, capture stats
-- Faction dashboard: scoreboard, active hides, territory map (static initially)
-- Protected routes (`/dashboard`, `/api/*`) fully gated — auth + Turnstile
-- `src/lib/supabase/server.ts` `createServiceRoleClient()` used in API routes
+- GitHub OAuth sign-in + SSR session handling (existing callback wired up)
+- First-time player onboarding: faction selection + display name + confirmation
+- Player dashboard: faction badge, display name, starter status, Reading founding mission, territory-map entry point
+- Faction-change rule: 30-day cooldown (future change mechanism; locked for pilot)
+- Fixed `players` RLS: direct table reads locked to owner/moderator/service_role; `public_player_profiles` view (display_name, faction, created_at) for public game data
+- New migration: `002_m2_m3_player_onboarding_territory.sql`
+- API routes with explicit DTOs: `GET /api/player/me`, `POST /api/player/onboard`, `GET /api/dashboard`, `GET /api/territory`
+- `territory_cells` table (materialized, seeded for Reading pilot)
+- MapLibre GL JS client-only territory map: H3 cell polygons, neutral/controlled/contested states, OpenFreeMap default
+- Correct H3→GeoJSON coordinate conversion: `[lat, lng]` → `[lng, lat]`, ring closure
+- Cell tap: safe public details (area label, status, controller, hide counts); unclaimed cells show "Found this territory" explanation
+- Vitest test foundation: H3→GeoJSON ordering, forbidden key leakage, onboarding schema, RLS boundaries
+- Playwright skeleton: redirect tests, public page render, API privacy check
 
 **Acceptance criteria:**
-- [ ] Player can sign in with GitHub OAuth and reach faction selection
-- [ ] Player can select a faction and set display name (stored in `players` table)
-- [ ] Unauthenticated requests to `/dashboard` redirect to `/`
-- [ ] Authenticated player sees their faction stats on profile page
-- [ ] Turnstile challenge fires on POST to `/api/*` routes
+- [ ] Fresh user can sign in, select faction, set display name, reach dashboard
+- [ ] Signed-in user can open a functioning Reading map on mobile viewport
+- [ ] Map uses H3 polygon cells; no pins, markers, or exact location data rendered
+- [ ] Public map API payloads contain no exact coordinates or private_location identifiers
+- [ ] Public player data cannot expose user_id, last_active_at, or internal fields
+- [ ] `players` RLS locked; `public_player_profiles` view is the only public player data path
+- [ ] Faction display names globally unique and case-insensitive
+- [ ] Unclaimed cells show "Found this territory" / "Coming soon" explanation
+- [ ] Lint, type check, production build, and focused tests all pass
 
 **Risks:**
-- GitHub OAuth scope creep — limit to `read:user` and `user:email`
-- Turnstile widget not rendering — ensure `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set
+- `players` RLS remains too broad (current state) — fixed in migration 002
+- MapLibre accidentally renders points/markers — GeoJSON builder centralized, Polygon-only output tested
+- API returns raw Supabase rows with private_location_id — explicit DTO mapping, no table passthrough
+- h3-utils coordinate ordering wrong — `[lat,lng]` → `[lng,lat]` reversal fixed + unit tested
+- OAuth E2E blocks CI — unit-test mappers, skeleton Playwright, live OAuth deferred
 
----
-
-## Milestone 3: Public Territory Map with MapLibre
-
-**What ships:**
-- MapLibre GL JS component rendered on faction dashboard
-- H3 res 7 cell polygons coloured by controller faction
-- Cell popup: cell label, approximate area, controller faction, active hides
-- OpenFreeMap tiles (default) + MapTiler fallback
-- No exact coordinates on map — only H3 cell boundaries
-
-**Acceptance criteria:**
-- [ ] Map renders in browser with correct H3 cell polygons for Reading pilot
-- [ ] Cells are coloured by faction (Verdant=green, Ember=red, Tide=blue, Unclaimed=grey, Contested=yellow)
-- [ ] Cell labels and approximate area shown in popup
-- [ ] No exact coordinates (no markers, no pins, no PostGIS points)
-- [ ] Map loads without MapTiler key (OpenFreeMap fallback)
-
-**Risks:**
-- MapTiler / OpenFreeMap tile availability in pilot region
-- Large number of cells rendering performance on mobile
+**Gstack planning artifacts:** `docs/gstack/meccha-m2-office-hours.md`, `docs/gstack/meccha-m2-ceo-review.md`, `docs/gstack/meccha-m2-eng-review.md`
 
 ---
 
