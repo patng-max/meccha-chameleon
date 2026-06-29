@@ -16,25 +16,30 @@ This invariant is enforced at three independent layers:
 
 ---
 
-## EXIF Stripping Verification
+## Image Sanitisation (EXIF Strip + Resize)
 
-**Implementation:** `src/lib/exif-strip.ts`
+**Implementation:** `src/lib/exif-strip.ts` → `sanitiseImage()`
 
 ```typescript
-export async function stripImageExif(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+import sharp from 'sharp';
+import ExifReader from 'exifreader';
+
+const MAX_DIMENSION = 1600;
+
+export async function sanitiseImage(buffer: ArrayBuffer): Promise<ArrayBuffer> {
   const input = Buffer.from(buffer);
-  // Parse to confirm image is valid (result discarded, only used as guard)
-  try { ExifReader.load(input); } catch { /* unsupported format */ }
+  try { ExifReader.load(input); } catch { /* unsupported format — throw early */ }
 
   const metadata = await sharp(input).metadata();
-  // .rotate() applies EXIF orientation then discards all metadata on re-encode
   const pipeline = sharp(input).rotate();
+
+  // Resize to max 1600px on longest edge; no upscaling
   const output =
     metadata.format === "png"
-      ? await pipeline.png().toBuffer()       // PNG recompress → no EXIF
-      : await pipeline.jpeg({ mozjpeg: true }).toBuffer(); // JPEG recompress → no EXIF
+      ? await pipeline.png().resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true }).toBuffer()
+      : await pipeline.jpeg({ mozjpeg: true }).resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true }).toBuffer();
 
-  // Return fresh buffer (no reference to original)
+  // Fresh ArrayBuffer — no reference to original input buffer
   return output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength) as ArrayBuffer;
 }
 ```
@@ -43,11 +48,56 @@ export async function stripImageExif(buffer: ArrayBuffer): Promise<ArrayBuffer> 
 - [x] JPEG path: `jpeg({ mozjpeg: true })` — mozjpeg strips all metadata
 - [x] PNG path: `png()` — recompresses, strips all metadata
 - [x] Rotation applied before re-encode (handles EXIF orientation tag)
+- [x] Resize to max 1600px longest edge (aspect ratio preserved, no upscaling)
 - [x] Return uses `.buffer.slice()` — fresh ArrayBuffer, no reference to input
 - [x] Both paths (JPEG and PNG) are covered
 - [x] `ExifReader.load()` is used as a format guard only (result not used for stripping)
+- [x] Raw upload buffer never written to disk — only sharp output written to VPS path
 
-**Gap noted:** `ExifReader.load()` result is discarded. This is non-blocking because sharp's re-encode deterministically strips metadata regardless of input metadata. Future improvement: assert that GPS IFD exists before strip and is absent after.
+---
+
+## VPS Media Storage Security
+
+**Supabase Storage is NOT used for images.** All media is stored on VPS persistent storage.
+
+### Public vs Private Path Split
+
+| Type | VPS path | Access |
+|------|----------|--------|
+| Clue photos | `/srv/meccha-chameleon/media/public/clues/` | Public — anyone with the URL |
+| Proof photos | `/srv/meccha-chameleon/media/private/proofs/` | Authenticated app routes only |
+
+**Staging:** `/srv/meccha-chameleon-staging/media/...`
+
+### Clue Photo Access (Public)
+- Served via Nginx at a public media hostname or safe path, behind Cloudflare
+- URL contains server-generated versioned filename (UUID or content hash) — no original filename, no player identity
+- `Cache-Control: public, max-age=31536000, immutable` — Cloudflare caches aggressively; long TTL is safe because filenames are versioned (immutable)
+- No authentication required to retrieve a clue photo URL (hides are moderator-approved before going live)
+
+### Proof Photo Access (Private)
+- **Never has a public static URL** — not served by Nginx as a static file
+- Released only through `GET /api/media/proof/:id` — authenticated + authorised (claimant or moderator)
+- `Cache-Control: private, no-store` — excluded from all CDN caching
+- Server retrieves file from `/srv/meccha-chameleon/media/private/proofs/` and streams to client
+- RLS check: `capture_claims` RLS policy ensures only `claimant_id = current_player_id()` or `is_moderator()` can access
+
+### No Raw Buffer Persistence
+- Raw upload buffer is processed in-memory by `sanitiseImage()` only — it is never written to disk or stored anywhere
+- Only the sharp-reencoded output (EXIF-stripped, resized) is written to VPS
+- If the sanitisation step fails, the raw buffer is discarded and an error is returned
+
+### Operational Security Rules
+- Media directories are NOT inside the immutable release path (`/opt/meccha-chameleon/`)
+- Media directories owned by `deploy` user — web container runs as a different user with read-only access to the release folder but write access to media via a bind mount or dedicated volume
+- No Supabase Storage credentials exist in the application — no `SUPABASE_STORAGE_*` env vars
+
+### Cloudflare Cache Rules
+
+| Rule | Condition | Action |
+|------|-----------|--------|
+| Cache public clues | `UrlPath` matches `/media/public/clues/*` | Cache-Control preserved, max-age=31536000 |
+| Bypass private proofs | `UrlPath` matches `/media/private/proofs/*` OR `Cache-Control: private` | Bypass cache, no-store |
 
 ---
 

@@ -87,7 +87,7 @@ Accepted (NEXT_PUBLIC_MAPLIBRE_STYLE_URL and NEXT_PUBLIC_MAPTILER_KEY in env).
 
 ---
 
-## ADR-004: Supabase Auth, Storage, PostGIS Setup
+## ADR-004: Supabase Auth, PostGIS Setup
 
 ### Status
 Accepted.
@@ -99,17 +99,71 @@ Accepted.
 - Server client: `createServerClient` (SSR) with `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - Service role: `createServiceRoleClient` (server-only, `SUPABASE_SERVICE_ROLE_KEY`)
 
-### Storage ⚠️ NOT YET IMPLEMENTED
-- Bucket: `clue-photos` (for clue images), `proof-photos` (for capture proof images) — **no Supabase Storage bucket or storage policy exists in migration yet**
-- All uploads processed through `exif-strip.ts` (Sharp re-encode) before Supabase Storage
-- Storage policies: authenticated users can upload; public read for clue photos (moderator-approved only)
-- **Implementation required in M4 (Hider deployment flow)**
-
 ### PostGIS
 - Extension: `postgis` in `public` schema
 - `private_hide_locations.exact_location` — `geometry(point, 4326)` (WGS84)
 - GiST index on `exact_location` for spatial queries
 - H3 resolution 7 cells computed server-side from exact coordinates via `h3-js`
+
+### What Supabase is NOT used for
+- **No Supabase Storage** for clue photos or proof photos in MVP. See ADR-004b.
+
+---
+
+## ADR-004b: VPS Persistent Storage for Media
+
+### Status
+Accepted (replaces Supabase Storage scope in ADR-004).
+
+### Decision
+All clue and proof images are stored on VPS persistent storage, not Supabase Storage.
+
+**Keep Supabase for:** PostgreSQL/PostGIS, Auth, RLS, database operations.
+**Do NOT use:** Supabase Storage buckets for clue-photos or proof-photos in the MVP.
+**Do NOT host:** Self-hosted complete Supabase stack on the existing shared application VPS.
+
+### Storage paths
+
+| Media type | VPS path | Visibility |
+|------------|-----------|------------|
+| Clue photos (public) | `/srv/meccha-chameleon/media/public/clues/` | Public — served via Nginx + Cloudflare |
+| Proof photos (private) | `/srv/meccha-chameleon/media/private/proofs/` | Private — authenticated app routes only |
+
+**Staging/production separation:**
+- Staging: `/srv/meccha-chameleon**-staging**/media/...`
+- Production: `/srv/meccha-chameleon/media/...`
+
+### Serving strategy
+
+**Public clue media (clue photos):**
+- Served through Nginx on a dedicated media hostname or safe public path, behind Cloudflare
+- `Cache-Control: public, max-age=31536000, immutable` — versioned generated filenames enable long-term caching
+- Cloudflare caches at edge; origin pull on miss
+
+**Private proof media (proof photos):**
+- Never has a public static URL
+- Released only through an authenticated + authorised application route (e.g. `GET /api/media/proof/:id`)
+- `Cache-Control: private, no-store` — excluded from Cloudflare caching entirely
+- Application route checks RLS: only claimant or moderator can retrieve
+
+### VPS operational requirements
+
+1. **Persistent media directories** provisioned at deploy time with `deploy` user ownership
+2. **Nginx configuration** for media serving: static file serving for `/srv/meccha-chameleon/media/public/`, proxy for private media via application
+3. **Cloudflare cache rules:** public clues cached at edge, private proofs bypass cache ( Cache Rules: `NOT Cache-Control: private` bypasses Cloudflare cache)
+4. **Backup:** media directories included in VPS backup job, restore verified separately from release folders
+5. **Directory structure:**
+   ```
+   /srv/meccha-chameleon/
+   ├── media/
+   │   ├── public/clues/        # versioned filenames, e.g. clues/v1_abc123.jpg
+   │   └── private/proofs/      # versioned filenames, e.g. proofs/v1_def456.jpg
+   ```
+
+### Filename strategy
+- All stored filenames are server-generated versioned identifiers (UUIDs or content hashes)
+- Original client-supplied filenames are never used as storage filenames
+- Database records store: `{path, width, height, content_type, stored_at}` — never original filename
 
 ---
 
@@ -179,44 +233,112 @@ All jobs use `createServiceRoleClient()` (service role key) to bypass RLS restri
 
 ---
 
-## ADR-008: Image Upload Flow with EXIF Stripping
+## ADR-008: Image Sanitisation Pipeline (Sharp)
 
 ### Status
 Accepted (validated in `src/lib/exif-strip.ts`).
 
 ### Decision
 
+All uploaded images (clue photos and proof photos) pass through a mandatory sanitisation pipeline before storage:
+
 ```
-Browser                   Server                    Supabase Storage
-   |                          |                            |
-   |-- upload request + --→  |                            |
-   |   photo (raw)            |                            |
-   |                          |-- sharp.recode() --------→|
-   |                          |   (EXIF stripped, fresh    |
-   |                          |    JPEG or PNG)            |
-   |                          |                            |
-   |←- storage URL ----------|-- store URL in -----------→|
-   |   (no EXIF)              |   public_hides.clue_photo  |
+Browser        Server                    VPS Storage
+   |               |                            |
+   |-- raw photo → |                            |
+   |               |-- ExifReader.load() ----→ | (validation guard only)
+   |               |-- sharp().rotate() ------→|
+   |               |   .resize(1600, {          |
+   |               |     longestSide: true       |
+   |               |   })                       |
+   |               |   .jpeg({ mozjpeg:true })  |  (or .png())
+   |               |-- (EXIF stripped,          |
+   |               |   max 1600px, fresh JPEG   |
+   |               |   or PNG)                   |
+   |               |                            |
+   |←- ArrayBuffer -|-- write to VPS ----------→|
+   |   (sanitised)    |   /srv/meccha-chameleon |
+   |               |   /media/public/clues/     |
+   |               |   /media/private/proofs/   |
 ```
 
-**`src/lib/exif-strip.ts`:**
+**`src/lib/exif-strip.ts` (updated for max-resize):**
 ```typescript
-// sharp re-encode: .rotate() applies EXIF orientation then discards metadata
-// JPEG: mozjpeg recompresses, drops all EXIF
-// PNG:  png() recompresses, drops all EXIF
-const pipeline = sharp(input).rotate();
-const output = metadata.format === "png"
-  ? await pipeline.png().toBuffer()
-  : await pipeline.jpeg({ mozjpeg: true }).toBuffer();
-return output.buffer.slice(byteOffset, byteOffset + byteLength) as ArrayBuffer;
+import sharp from 'sharp';
+import ExifReader from 'exifreader';
+
+const MAX_DIMENSION = 1600;
+
+export async function sanitiseImage(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const input = Buffer.from(buffer);
+
+  // Validation guard — confirms image is parseable before processing
+  try { ExifReader.load(input); } catch { /* unsupported format */ }
+
+  const metadata = await sharp(input).metadata();
+
+  // Rotate applies EXIF orientation then discards all metadata on re-encode
+  const pipeline = sharp(input).rotate();
+
+  // Resize to max 1600px on longest edge (preserves aspect ratio)
+  const output =
+    metadata.format === "png"
+      ? await pipeline.png().resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true }).toBuffer()
+      : await pipeline.jpeg({ mozjpeg: true }).resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true }).toBuffer();
+
+  // Return fresh ArrayBuffer — no reference to original input buffer
+  return output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength) as ArrayBuffer;
+}
 ```
 
-**Verification:**
-- `ExifReader.load(input)` is called but result is discarded — used only to confirm image is parseable before re-encoding
-- Both JPEG and PNG paths strip all metadata
-- No GPS data survives into the returned `ArrayBuffer`
+### Rules enforced
 
-**Upload endpoint:** `POST /api/upload` (protected, authenticated, Turnstile-verified) → server-side EXIF strip → upload to Supabase Storage → return public URL → store in `public_hides.clue_photo_url`
+1. **EXIF stripped:** Both JPEG (mozjpeg) and PNG paths remove all metadata including GPS, camera info, timestamps
+2. **Max dimension:** Longest edge capped at 1600px; aspect ratio preserved; no upscaling
+3. **Original never persisted:** The raw upload buffer is held in memory only during request processing; it is never written to disk or stored
+4. **Safe filenames:** Server-generated (UUID or content-hash); never the original client-supplied filename
+5. **Format:** Output is either JPEG (mozjpeg) or PNG — no WebP, HEIC, or other exotic formats accepted
+
+### Upload endpoint contract
+
+`POST /api/upload` (protected, authenticated, Turnstile-verified):
+- Receives raw image binary
+- Calls `sanitiseImage()` → fresh sanitised `ArrayBuffer`
+- Writes to VPS path (`/srv/meccha-chameleon/media/public/clues/` or `/media/private/proofs/`)
+- Stores `{path, width, height, content_type, stored_at}` in the relevant Supabase table (`public_hides.clue_photo_url` or `capture_claims.proof_photo_url`)
+- Returns the stored path reference (not a full URL)
+
+---
+
+## ADR-008b: Media Backup Strategy
+
+### Status
+Accepted.
+
+### Decision
+
+Media backup is decoupled from application release management.
+
+| What | Where | Backup |
+|------|-------|--------|
+| Application code + Docker image | VPS `/opt/meccha-chameleon/` | GitHub Container Registry (immutable tags) |
+| Database (Supabase managed) | Supabase cloud | Supabase point-in-time recovery + daily manual exports |
+| Media files | VPS `/srv/meccha-chameleon/media/` | Separate rsync/borg backup job to offsite storage |
+
+### Media backup requirements
+
+1. **Separate from release:** `/srv/meccha-chameleon/media/` is NOT inside `/opt/meccha-chameleon/` (the immutable release folder). It persists across deployments.
+2. **Included in VPS backup:** A dedicated backup job (borg/rsnapshot) backs up `/srv/meccha-chameleon/media/` to offsite storage (e.g. rsync.net, B2).
+3. **Restore verified:** Backup restore is tested quarterly and documented in the runbook.
+4. **Staging separate:** Staging media at `/srv/meccha-chameleon-staging/media/` is backed up on the same schedule but to a separate backup destination.
+5. **No credentials in media dir:** Backup job uses SSH key authentication, not credentials embedded in the backup script.
+
+### Runbook entry
+
+> **Media Restore Runbook**
+> Location: `docs/runbooks/media-restore.md`
+> Trigger: Data loss incident or disaster recovery
+> Steps: (1) Stop web container, (2) rsync latest media snapshot from offsite → `/srv/meccha-chameleon/media/`, (3) Verify checksum against backup manifest, (4) Restart container, (5) Smoke test: upload a test clue photo, retrieve it via Nginx.
 
 ---
 

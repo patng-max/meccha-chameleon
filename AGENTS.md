@@ -66,6 +66,14 @@ These rules are never relaxed, regardless of context:
 - All uploaded photos (clue photos and proof photos) must be processed through `src/lib/exif-strip.ts` before storage
 - Never store the raw uploaded buffer — only the sharp-reencoded output
 
+### Media storage — VPS only, not Supabase Storage
+
+- All clue and proof images are stored on VPS persistent storage at `/srv/meccha-chameleon/media/`
+- Public clue media: `/srv/meccha-chameleon/media/public/clues/` — served via Nginx + Cloudflare (Cache-Control: public, max-age=31536000, immutable)
+- Private proof media: `/srv/meccha-chameleon/media/private/proofs/` — never has a public URL; served only via authenticated app route
+- **Never use Supabase Storage buckets** for clue-photos or proof-photos
+- Staging uses `/srv/meccha-chameleon-staging/media/` (separate from production)
+
 ---
 
 ## Codex CLI Usage

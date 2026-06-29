@@ -42,7 +42,6 @@
 - Player profile page: faction badge, display name, owned hides, capture stats
 - Faction dashboard: scoreboard, active hides, territory map (static initially)
 - Protected routes (`/dashboard`, `/api/*`) fully gated — auth + Turnstile
-- Supabase Storage buckets configured: `clue-photos`, `proof-photos`
 - `src/lib/supabase/server.ts` `createServiceRoleClient()` used in API routes
 
 **Acceptance criteria:**
@@ -85,7 +84,8 @@
 **What ships:**
 - Hide submission form: GPS coordinate picker, approximate area label, clue photo upload, difficulty, safety checklist
 - Server-side: exact GPS → H3 res 7 cell computation → insert `private_hide_locations` + `public_hides`
-- EXIF stripping before upload to Supabase Storage
+- EXIF stripping + Sharp resize (max 1600px) before write to VPS persistent storage (`/srv/meccha-chameleon/media/public/clues/`)
+- Media upload API route writes to VPS, not Supabase Storage
 - Moderation queue: list of `awaiting_moderation` hides with approve/reject actions
 - Moderator actions: approve (set status='live'), reject (set status='retired'), request more info
 - `moderator_actions` audit log entries written on every moderation decision
@@ -160,6 +160,10 @@
 - Pilot acceptance test suite (see `docs/test-strategy.md`)
 - Staging environment fully mirroring production
 - Deployment pipeline: GitHub Actions → Docker → VPS
+- Persistent media directories provisioned at deploy time (`/srv/meccha-chameleon/media/public/clues/`, `/srv/meccha-chameleon/media/private/proofs/`)
+- Nginx configured for public media serving + private media proxy routes
+- Cloudflare Cache Rules configured: public clues cached (max-age=31536000, immutable), private proofs excluded (bypass)
+- Backup runbook for media directory restore documented (`docs/runbooks/media-restore.md`)
 
 **Acceptance criteria:**
 - [ ] No way to retrieve `private_hide_locations.exact_location` via browser API
@@ -192,4 +196,4 @@
 ### Performance
 - MapLibre cell rendering: limit to viewport cells only for large cities
 - Supabase query pagination on moderation queue
-- Image CDN via Supabase Storage CDN (not origin-only)
+- Image CDN via Cloudflare (public clue media) + authenticated application routes (private proof media)

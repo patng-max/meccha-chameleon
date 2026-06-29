@@ -64,7 +64,7 @@ Test strategy follows a **three-layer pyramid**:
 
 | Route | Tests |
 |-------|-------|
-| `POST /api/upload` | Accepts valid image, returns URL; rejects non-image; strips EXIF before storage |
+| `POST /api/upload` | Accepts valid image, returns VPS path reference; rejects non-image; sanitises (EXIF strip + max 1600px resize) before write to `/srv/meccha-chameleon/media/` |
 | `POST /api/hides` | Valid submission inserts to both tables; invalid GPS rejected; unauthenticated rejected |
 | `GET /api/territory` | Returns public territory events; no coordinates |
 
@@ -97,7 +97,7 @@ npm test -- --ui  # vitest browser UI (local dev)
 1. Player can sign in with GitHub OAuth → reaches dashboard
 2. Authenticated player can see live hides on territory map
 3. Hide submission form: exact GPS stored in `private_hide_locations` (not visible in any UI)
-4. Clue photo uploaded → EXIF-stripped before storage (verify via Storage API)
+4. Clue photo uploaded → EXIF-stripped + resized before write to VPS path (verify file exists at VPS path, original buffer not on disk)
 5. Moderator approves hide → hide appears on territory map
 6. Seeker submits proof for live hide → capture claim created
 7. Moderator approves capture → territory event logged, cell flips faction
