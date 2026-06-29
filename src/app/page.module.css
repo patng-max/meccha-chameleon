@@ -1,142 +1,541 @@
+/* ============================================================
+   Meccha Chameleon: Faction Hunt — Page Styles
+   Mobile-first, faction-themed, Reading pilot layout
+   ============================================================ */
+
 .page {
-  --background: #fafafa;
-  --foreground: #fff;
-
-  --text-primary: #000;
-  --text-secondary: #666;
-
-  --button-primary-hover: #383838;
-  --button-secondary-hover: #f2f2f2;
-  --button-secondary-border: #ebebeb;
-
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-geist-sans);
-  background-color: var(--background);
-}
-
-.main {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  max-width: 800px;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  background-color: var(--foreground);
-  padding: 120px 60px;
-}
-
-.intro {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 24px;
+  min-height: 100dvh;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: var(--font-geist-sans, system-ui, sans-serif);
+  line-height: 1.6;
 }
 
-.intro h1 {
-  max-width: 320px;
-  font-size: 40px;
+/* ── Hero ──────────────────────────────────────────────────── */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  padding: 3rem 1.5rem 2rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+@media (min-width: 768px) {
+  .hero {
+    grid-template-columns: 1fr 1fr;
+    padding: 4rem 3rem 3rem;
+    align-items: center;
+  }
+}
+
+.heroContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kicker {
+  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 48px;
-  letter-spacing: -2.4px;
-  text-wrap: balance;
-  color: var(--text-primary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #38bdf8;
+  margin: 0;
 }
 
-.intro p {
-  max-width: 440px;
-  font-size: 18px;
-  line-height: 32px;
-  text-wrap: balance;
-  color: var(--text-secondary);
+.heroContent h1 {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: #f8fafc;
+  margin: 0;
 }
 
-.intro a {
-  font-weight: 500;
-  color: var(--text-primary);
+.heroCopy {
+  font-size: 1rem;
+  color: #94a3b8;
+  margin: 0;
+  max-width: 44ch;
 }
 
-.ctas {
+.heroActions {
   display: flex;
-  flex-direction: row;
-  width: 100%;
-  max-width: 440px;
-  gap: 16px;
-  font-size: 14px;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
-.ctas a {
-  display: flex;
-  justify-content: center;
+.primaryAction {
+  display: inline-flex;
   align-items: center;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 128px;
-  border: 1px solid transparent;
-  transition: 0.2s;
-  cursor: pointer;
-  width: fit-content;
+  height: 44px;
+  padding: 0 1.25rem;
+  border-radius: 8px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.primaryAction:hover {
+  background: #7dd3fc;
+}
+
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  color: #cbd5e1;
   font-weight: 500;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
 }
 
-a.primary {
-  background: var(--text-primary);
-  color: var(--background);
-  gap: 8px;
+.secondaryAction:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
 }
 
-a.secondary {
-  border-color: var(--button-secondary-border);
+/* ── Map Panel ─────────────────────────────────────────────── */
+
+.mapPanel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1rem;
+  overflow: hidden;
 }
 
-/* Enable hover only on non-touch devices */
-@media (hover: hover) and (pointer: fine) {
-  a.primary:hover {
-    background: var(--button-primary-hover);
-    border-color: transparent;
-  }
+.mapHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
 
-  a.secondary:hover {
-    background: var(--button-secondary-hover);
-    border-color: transparent;
+.mapHeader strong {
+  color: #e2e8f0;
+}
+
+.hexMap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.hexCell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  font-size: 0.65rem;
+  transition: transform 0.15s;
+}
+
+.hexCell:hover {
+  transform: scale(1.04);
+}
+
+.hexCell span {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+
+.hexCell strong {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hexCell.verdant   { background: #15803d; color: #fff; }
+.hexCell.ember     { background: #c2410c; color: #fff; }
+.hexCell.tide      { background: #0369a1; color: #fff; }
+.hexCell.unclaimed { background: #334155; color: #94a3b8; }
+.hexCell.contested { background: #7c3aed; color: #fff; }
+
+/* ── Metrics bar ───────────────────────────────────────────── */
+
+.metrics {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid #1e293b;
+  border-bottom: 1px solid #1e293b;
+  background: #1e293b;
+}
+
+.metrics > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0.5rem;
+  gap: 0.2rem;
+  border-right: 1px solid #334155;
+}
+
+.metrics > div:last-child {
+  border-right: none;
+}
+
+.metrics strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.metrics span {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-align: center;
+}
+
+/* ── Sections ──────────────────────────────────────────────── */
+
+.section {
+  padding: 3rem 1.5rem;
+  border-top: 1px solid #1e293b;
+}
+
+.sectionIntro {
+  margin-bottom: 2rem;
+}
+
+.sectionIntro h2 {
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0.4rem 0 0;
+  letter-spacing: -0.01em;
+}
+
+.sectionIntro p {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  margin: 0.75rem 0 0;
+  max-width: 56ch;
+}
+
+/* ── Faction Grid ──────────────────────────────────────────── */
+
+.factionGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .factionGrid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media (max-width: 600px) {
-  .main {
-    padding: 48px 24px;
-  }
+.factionCard {
+  background: var(--soft-accent, #1e293b);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid var(--accent, #334155);
+  color: var(--accent, #94a3b8);
+}
 
-  .intro {
-    gap: 16px;
-  }
+.factionCard h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--accent, #f8fafc);
+}
 
-  .intro h1 {
-    font-size: 32px;
-    line-height: 40px;
-    letter-spacing: -1.92px;
+.factionCard p {
+  font-size: 0.85rem;
+  margin: 0;
+  opacity: 0.85;
+}
+
+.factionCard blockquote {
+  font-size: 0.85rem;
+  font-style: italic;
+  margin: 0;
+  opacity: 0.7;
+  border-left: 3px solid var(--accent, #334155);
+  padding-left: 0.75rem;
+}
+
+.factionBadge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent, #334155);
+  opacity: 0.2;
+}
+
+.factionStats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+.factionStats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.factionStats dt {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.factionStats dd {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--accent, #f8fafc);
+}
+
+/* ── Game Board (flow + hide list) ─────────────────────────── */
+
+.gameBoard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  padding: 3rem 1.5rem;
+  border-top: 1px solid #1e293b;
+}
+
+@media (min-width: 768px) {
+  .gameBoard {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .logo {
-    filter: invert();
+.flowList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.flowList article {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.flowList article span {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.1rem;
+}
+
+.flowList article h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: #f8fafc;
+}
+
+.flowList article p {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.hideList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hideCard {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hideCard > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.hideCard > div span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.hideCard > div strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.hideCard > p {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+  font-style: italic;
+}
+
+.hideCard > dl {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.hideCard > dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.hideCard dt {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.hideCard dd {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.hideCard small {
+  font-size: 0.7rem;
+  color: #475569;
+  border-top: 1px solid #334155;
+  padding-top: 0.5rem;
+}
+
+/* ── City Grid ─────────────────────────────────────────────── */
+
+.cityGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .cityGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.cityCard {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cityCard span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.cityCard h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: #f8fafc;
+}
+
+.cityCard p {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ── Safety Panel ──────────────────────────────────────────── */
+
+.safetyPanel {
+  background: #1e293b;
+  border-top: 1px solid #334155;
+  padding: 3rem 1.5rem;
+}
+
+.safetyPanel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 60ch;
+}
+
+.safetyPanel li {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.safetyPanel li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+/* ── Responsive tweaks ─────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .heroActions {
+    flex-direction: column;
   }
 
-  .page {
-    --background: #000;
-    --foreground: #000;
+  .primaryAction,
+  .secondaryAction {
+    width: 100%;
+    justify-content: center;
+  }
 
-    --text-primary: #ededed;
-    --text-secondary: #999;
-
-    --button-primary-hover: #ccc;
-    --button-secondary-hover: #1a1a1a;
-    --button-secondary-border: #1a1a1a;
+  .hexMap {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
