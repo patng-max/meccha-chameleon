@@ -1,0 +1,102 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: "22.22.2"
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  deploy:
+    name: Deploy Staging
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package release
+        run: |
+          mkdir -p release-package
+          # Exclude dev artifacts; include standalone build outputs, public, and static assets
+          cp -r src package.json package-lock.json next.config.ts tsconfig.json vitest.config.ts public .next release-package/ 2>/dev/null || true
+          # Remove .next cache to reduce artifact size
+          rm -rf release-package/.next/cache
+          tar -czf meccha-staging-${{ github.sha }}.tar.gz -C release-package .
+
+      - name: Transfer to VPS
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: deploy
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: meccha-staging-${{ github.sha }}.tar.gz
+          target: /tmp/
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v0.1.11
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: deploy
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            set -e
+            RELEASE_SHA="${{ github.sha }}"
+            RELEASE_DIR="/opt/meccha-chameleon/staging/releases/$RELEASE_SHA"
+            mkdir -p "$RELEASE_DIR"
+            tar -xzf /tmp/meccha-staging-$RELEASE_SHA.tar.gz -C "$RELEASE_DIR"
+            cd "$RELEASE_DIR"
+            /home/deploy/.nvm/versions/node/v22.22.2/bin/npm ci --omit=dev --silent
+            /home/deploy/.nvm/versions/node/v22.22.2/bin/node node_modules/.bin/next build
+            # Ensure media directories exist
+            mkdir -p /srv/meccha-chameleon-staging/media/public/clues
+            mkdir -p /srv/meccha-chameleon-staging/media/private/proofs
+            # Atomic symlink switch
+            rm -f /opt/meccha-chameleon/staging/current
+            ln -s "$RELEASE_DIR" /opt/meccha-chameleon/staging/current
+            # Restart systemd service
+            sudo systemctl restart meccha-chameleon-staging
+            # Health check (5 retries, 5s apart)
+            for i in 1 2 3 4 5; do
+              sleep 5
+              if curl -sf http://127.0.0.1:4201/api/health | grep -q '"status":"healthy"'; then
+                echo "Health check passed (attempt $i)"
+                exit 0
+              fi
+              echo "Health check attempt $i failed"
+            done
+            # Rollback on failure
+            echo "Health check failed — rolling back"
+            sudo systemctl stop meccha-chameleon-staging
+            rm -f /opt/meccha-chameleon/staging/current
+            PREV=$(ls -1t /opt/meccha-chameleon/staging/releases/ | grep -v "^$RELEASE_SHA$" | head -1)
+            if [ -n "$PREV" ]; then
+              ln -s "/opt/meccha-chameleon/staging/releases/$PREV" /opt/meccha-chameleon/staging/current
+              sudo systemctl restart meccha-chameleon-staging
+              echo "Rolled back to: $PREV"
+            fi
+            exit 1
