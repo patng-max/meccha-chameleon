@@ -1,0 +1,230 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100dvh - 60px);
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: var(--font-geist-sans, system-ui, sans-serif);
+  padding: 2rem 1rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 720px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.kicker {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 0.75rem;
+}
+
+.subtitle {
+  font-size: 0.9375rem;
+  color: #94a3b8;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ── Form ─────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.factionGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .factionGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.fieldHint {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.hiddenRadio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.factionCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: #1e293b;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.factionCard:hover {
+  background: #334155;
+}
+
+.factionCard.selected {
+  border-color: var(--accent);
+  background: var(--soft-accent);
+}
+
+.factionCard h3 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 0.25rem;
+}
+
+.factionSignal {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.factionMotto {
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #cbd5e1;
+  margin: 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--accent);
+}
+
+.factionStats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+
+.factionStats > div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.factionStats dt {
+  font-weight: 600;
+}
+
+.factionStats dd {
+  margin: 0;
+}
+
+.factionBadge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ── Display name ─────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.textInput {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.textInput::placeholder {
+  color: #475569;
+}
+
+/* ── Errors ───────────────────────────────────────────────── */
+
+.errorMessage {
+  padding: 0.625rem 0.875rem;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* ── Submit ──────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  justify-content: center;
+}
+
+.submitButton {
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  border: none;
+  background: #6366f1;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

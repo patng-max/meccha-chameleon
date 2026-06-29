@@ -1,0 +1,257 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100dvh - 60px);
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: var(--font-geist-sans, system-ui, sans-serif);
+  padding: 2rem 1rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Identity card ─────────────────────────────────────────── */
+
+.identityCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 16px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  overflow: hidden;
+}
+
+.factionBadge {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.identityInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.factionName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent, #94a3b8);
+}
+
+.displayName {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.motto {
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ── Section ─────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+/* ── Standings grid ──────────────────────────────────────── */
+
+.standingsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.standingCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+}
+
+.standingCard.playerFaction {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, #1e293b);
+}
+
+.standingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.standingName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--accent, #94a3b8);
+}
+
+.youBadge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.standingStats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.standingStats > div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.standingStats dt {
+  font-weight: 500;
+}
+
+.standingStats dd {
+  margin: 0;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* ── Mission card ────────────────────────────────────────── */
+
+.missionCard {
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  border: 1px solid #1e40af;
+}
+
+.missionLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #60a5fa;
+  margin-bottom: 0.375rem;
+}
+
+.missionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0 0 0.5rem;
+}
+
+.missionBody {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Map entry ───────────────────────────────────────────── */
+
+.mapEntry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: #1e293b;
+  border: 1px solid #334155;
+}
+
+.mapEntryContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.mapEntryTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.mapEntryBody {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.mapEntryButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+  margin-top: 0.5rem;
+  align-self: flex-start;
+}
+
+.mapEntryButton:hover {
+  background: #4f46e5;
+}
+
+.mapPreview {
+  flex-shrink: 0;
+}
+
+.hexGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 4px;
+}
+
+.hex {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  opacity: 0.7;
+}

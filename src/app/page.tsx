@@ -7,6 +7,8 @@ import {
   safetyRules,
   type FactionId,
 } from "@/lib/game-data";
+import { createServerAnonClient } from "@/lib/supabase/server";
+import { HeroActions } from "./hero-actions";
 import styles from "./page.module.css";
 
 const controllerLabels: Record<string, string> = {
@@ -26,7 +28,23 @@ function factionStyle(factionId: FactionId) {
   } as React.CSSProperties;
 }
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createServerAnonClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let playerExists = false;
+  if (user) {
+    const { data: player } = await supabase
+      .from("players")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    playerExists = !!player;
+  }
+
   const totalTerritories = factions.reduce(
     (sum, faction) => sum + faction.territories,
     0,
@@ -46,14 +64,10 @@ export default function Home() {
             publish clue photos without exact coordinates, and help your faction
             conquer real-world territory one H3 cell at a time.
           </p>
-          <div className={styles.heroActions} aria-label="Primary actions">
-            <a href="#join" className={styles.primaryAction}>
-              Join a faction
-            </a>
-            <a href="#founding" className={styles.secondaryAction}>
-              Found a city
-            </a>
-          </div>
+          <HeroActions
+            isAuthenticated={!!user}
+            isOnboarded={playerExists}
+          />
         </div>
 
         <div className={styles.mapPanel} aria-label="Reading territory preview">

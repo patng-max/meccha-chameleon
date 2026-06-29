@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedRoutePrefixes = ["/api", "/dashboard"];
+const protectedRoutePrefixes = ["/api", "/dashboard", "/onboarding"];
 
 async function verifyTurnstile(request: NextRequest) {
   if (request.method !== "POST") {
