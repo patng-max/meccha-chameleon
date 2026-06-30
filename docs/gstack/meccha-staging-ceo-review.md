@@ -172,7 +172,7 @@ systemd restart: meccha-chameleon-staging.service
 Health check: http://127.0.0.1:4201/api/health
     |
     v
-External check: https://meccha-staging.amfbss.com/api/health
+External check: https://staging.meccha.fun/api/health
 ```
 
 Release paths:
@@ -239,8 +239,8 @@ DNS/TLS should be provisioned as an explicit checklist, not hidden in a deploy s
 
 Required:
 
-- Cloudflare proxied DNS record: `meccha-staging.amfbss.com`.
-- Nginx virtual host for `meccha-staging.amfbss.com`.
+- Cloudflare proxied DNS record: `staging.meccha.fun`.
+- Nginx virtual host for `staging.meccha.fun`.
 - Origin certificate installed on the VPS before enabling Full strict.
 - Cloudflare SSL/TLS mode: Full strict.
 - Always Use HTTPS enabled.
@@ -356,7 +356,7 @@ deploy job
 
 ## Acceptance Criteria
 
-- `https://meccha-staging.amfbss.com/api/health` returns `200`.
+- `https://staging.meccha.fun/api/health` returns `200`.
 - Health response contains no secrets, coordinates, internal file paths, or raw env dumps.
 - GitHub Actions can deploy from `main` without manual SSH commands.
 - Failed deploy leaves prior release running.

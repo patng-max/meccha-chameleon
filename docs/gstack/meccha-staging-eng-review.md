@@ -91,7 +91,7 @@ ssh scripts/deploy/staging-install.sh <artifact> <release-id>
     +--> switch current symlink atomically
     +--> restart meccha-chameleon-staging.service
     +--> local health: http://127.0.0.1:4201/api/health
-    +--> external health: https://meccha-staging.amfbss.com/api/health
+    +--> external health: https://staging.meccha.fun/api/health
     |
     +--> success: retain new current
     |

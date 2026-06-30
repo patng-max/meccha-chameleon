@@ -43,6 +43,6 @@ echo "2. Copy systemd service: cp $STAGING_ROOT/../../../deploy/staging/meccha-c
 echo "3. Copy Nginx config: cp ... /etc/nginx/sites-available/meccha-chameleon-staging"
 echo "4. systemctl daemon-reload && systemctl enable meccha-chameleon-staging"
 echo "5. nginx -t && systemctl reload nginx"
-echo "6. Cloudflare: add A record meccha-staging.amfbss.com → 187.77.103.25 (proxied)"
+echo "6. Cloudflare: add A record staging.meccha.fun → 187.77.103.25 (proxied)"
 echo ""
 echo "Done."

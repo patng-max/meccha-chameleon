@@ -92,17 +92,17 @@
 - `scripts/deploy/staging-install.sh` — upload, unpack, symlink switch, systemd restart, health check, auto-rollback on failure
 - `scripts/deploy/staging-rollback.sh` — explicit operator rollback to previous or specified release
 - `deploy/staging/meccha-chameleon-staging.service` — systemd unit template
-- `deploy/staging/nginx-meccha-chameleon-staging.conf` — Nginx vhost template for `meccha-staging.amfbss.com`
+- `deploy/staging/nginx-meccha-chameleon-staging.conf` — Nginx vhost template for `staging.meccha.fun`
 - `.github/workflows/staging.yml` — CI gates + artifact build + SCP deploy + health verification
 - `docs/runbooks/staging-deployment.md` — VPS setup, DNS/TLS checklist, deploy, rollback, logs, troubleshooting
 - VPS directory structure: `/opt/meccha-chameleon/staging/releases/<ts>-<sha>/`, `/opt/meccha-chameleon/staging/current` symlink
 - Persistent media dirs: `/srv/meccha-chameleon-staging/media/public/clues/`, `/srv/meccha-chameleon-staging/media/private/proofs/`
-- Supabase staging project (`rquntpbnpvslnnjzaaxd`) OAuth redirect URL for `https://meccha-staging.amfbss.com/auth/callback`
+- Supabase staging project (`rquntpbnpvslnnjzaaxd`) OAuth redirect URL for `https://staging.meccha.fun/auth/callback`
 
 **Acceptance criteria:**
 - [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` all pass in CI before deploy
 - [ ] GitHub Actions deploys staging automatically on push to `main` (no manual SSH)
-- [ ] `https://meccha-chameleon-staging.amfbss.com/api/health` returns HTTP 200 with non-secret JSON
+- [ ] `https://staging.meccha.fun/api/health` returns HTTP 200 with non-secret JSON
 - [ ] systemd service `meccha-chameleon-staging.service` is enabled and running
 - [ ] App binds only to `127.0.0.1:4201` (localhost)
 - [ ] Nginx proxies HTTPS traffic to the app on port 4201
@@ -119,7 +119,7 @@
 
 **Dependencies:**
 - VPS deploy user with SSH key authorized for non-interactive GitHub Actions SCP/SSH
-- Cloudflare proxied DNS record for `meccha-staging.amfbss.com`
+- Cloudflare proxied DNS record for `staging.meccha.fun`
 - Cloudflare origin certificate installed on VPS before enabling Full strict TLS
 - Staging Supabase project with OAuth callback URL configured
 

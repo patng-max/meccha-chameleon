@@ -111,7 +111,7 @@ sudo systemctl enable meccha-chameleon-staging.service
 
 ### 8. Cloudflare DNS
 
-- Add a proxied A record: `meccha-staging.amfbss.com` → `187.77.103.25`
+- Add a proxied A record: `staging.meccha.fun` → `187.77.103.25`
 - Set SSL/TLS mode to **Full (strict)**
 - Enable **Always Use HTTPS**
 - Create a Cache Rule: `UrlPath` matches `/media/public/clues/*` → **Cache eligibility: eligible, max-age=31536000**
@@ -120,7 +120,7 @@ sudo systemctl enable meccha-chameleon-staging.service
 ### 9. Supabase OAuth callback
 
 Add to staging Supabase project authentication settings:
-- Redirect URL: `https://meccha-staging.amfbss.com/auth/callback`
+- Redirect URL: `https://staging.meccha.fun/auth/callback`
 
 ---
 
@@ -133,7 +133,7 @@ Staging deploys automatically on every push to `main` via GitHub Actions.
 2. Package standalone artifact
 3. Upload to VPS via SCP
 4. `staging-install.sh` unpacks, symlink-switches, restarts systemd, health-checks
-5. External health check against `https://meccha-staging.amfbss.com/api/health`
+5. External health check against `https://staging.meccha.fun/api/health`
 
 **Verify a successful deploy:**
 
@@ -142,7 +142,7 @@ Staging deploys automatically on every push to `main` via GitHub Actions.
 curl -s http://127.0.0.1:4201/api/health
 
 # External health
-curl -s https://meccha-staging.amfbss.com/api/health
+curl -s https://staging.meccha.fun/api/health
 
 # Check which release is live
 ls -la /opt/meccha-chameleon/staging/current
@@ -181,7 +181,7 @@ ssh deploy@app.amfbss.com \
 **After rollback, verify:**
 ```bash
 curl -s http://127.0.0.1:4201/api/health
-curl -s https://meccha-chameleon-staging.amfbss.com/api/health
+curl -s https://staging.meccha.fun/api/health
 ```
 
 ### List available releases
@@ -197,13 +197,13 @@ ssh deploy@app.amfbss.com \
 
 ### Health endpoint
 ```bash
-curl -s https://meccha-staging.amfbss.com/api/health | python3 -m json.tool
+curl -s https://staging.meccha.fun/api/health | python3 -m json.tool
 ```
 
 ### Public media accessible
 ```bash
 # Should return image data with long cache headers
-curl -sI https://meccha-staging.amfbss.com/media/public/clues/test.jpg \
+curl -sI https://staging.meccha.fun/media/public/clues/test.jpg \
   | grep -E 'Content-Type|Cache-Control|HTTP/'
 
 # Expected Cache-Control: public, max-age=31536000, immutable
@@ -212,7 +212,7 @@ curl -sI https://meccha-staging.amfbss.com/media/public/clues/test.jpg \
 ### Private media NOT publicly accessible
 ```bash
 # Must return 404 or deny (not 200)
-curl -sI https://meccha-staging.amfbss.com/media/private/proofs/test.jpg \
+curl -sI https://staging.meccha.fun/media/private/proofs/test.jpg \
   | grep -E 'HTTP/'
 
 # Should NOT have Cache-Control: public
@@ -221,7 +221,7 @@ curl -sI https://meccha-staging.amfbss.com/media/private/proofs/test.jpg \
 ### Nginx serving app
 ```bash
 # App routes proxied
-curl -sI https://meccha-staging.amfbss.com/api/territory \
+curl -sI https://staging.meccha.fun/api/territory \
   | grep -E 'HTTP/|Content-Type'
 
 # Should return HTTP 200 with JSON
@@ -310,12 +310,12 @@ ssh deploy@app.amfbss.com \
 
 ### CSS/assets missing after deploy
 - Check `.next/static` was copied into the release: `ls /opt/meccha-chameleon/staging/current/.next/static/`
-- Check Nginx is serving static files: `curl -sI https://meccha-staging.amfbss.com/_next/static/...`
+- Check Nginx is serving static files: `curl -sI https://staging.meccha.fun/_next/static/...`
 - If missing, the release was likely not packaged correctly — rollback and investigate
 
 ### Private media returns 200 (security incident)
 - Immediately investigate Nginx config for misconfigured aliases
-- Run: `curl -sI https://meccha-staging.amfbss.com/media/private/proofs/test.jpg`
+- Run: `curl -sI https://staging.meccha.fun/media/private/proofs/test.jpg`
 - If public, block the URL at Cloudflare level and escalate
 
 ---

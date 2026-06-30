@@ -438,7 +438,7 @@ Accepted.
 
 #### Nginx contract
 
-- `server_name meccha-staging.amfbss.com`
+- `server_name staging.meccha.fun`
 - Proxies to `127.0.0.1:4201`
 - Serves `/srv/meccha-chameleon-staging/media/public/` at `/media/public/` with `Cache-Control: public, max-age=31536000, immutable`
 - Explicitly does NOT serve `/media/private/` as static files
@@ -446,7 +446,7 @@ Accepted.
 
 #### Cloudflare contract
 
-- Proxied A record for `meccha-staging.amfbss.com`
+- Proxied A record for `staging.meccha.fun`
 - SSL/TLS mode: Full (strict)
 - Always Use HTTPS: enabled
 - Public clue media: cached at edge (immutable URL strategy)
@@ -476,7 +476,7 @@ staging-install.sh <release-id>
     ├── atomic symlink switch: current → new release
     ├── systemctl restart meccha-chameleon-staging.service
     ├── local health: http://127.0.0.1:4201/api/health
-    ├── external health: https://meccha-staging.amfbss.com/api/health
+    ├── external health: https://staging.meccha.fun/api/health
     │
     ├── success: done
     │
@@ -503,7 +503,7 @@ staging-install.sh <release-id>
 
 ### Consequences
 
-- ADR-005 staging hostname (`staging.taiwan-way.co.uk`) is replaced by `meccha-staging.amfbss.com`
+- ADR-005 staging hostname (`staging.taiwan-way.co.uk`) is replaced by `staging.meccha.fun`
 - ADR-005 Docker-based staging intent is replaced by systemd + immutable releases for staging
 - Production deployment (Docker) is deferred to a separate production deployment milestone
 - Staging is isolated from production: separate Supabase project, separate media paths, separate secrets

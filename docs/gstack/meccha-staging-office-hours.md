@@ -14,7 +14,7 @@ The requested staging slice is:
 
 - Immutable artifact deployment
 - systemd service running the Next.js app on port `4201`
-- Nginx virtual host for `meccha-staging.amfbss.com`
+- Nginx virtual host for `staging.meccha.fun`
 - Cloudflare DNS and TLS in front of the VPS
 - Persistent staging media directories under `/srv/meccha-chameleon-staging/media/`
 - Health endpoint for deploy and uptime checks
@@ -48,7 +48,7 @@ Current repo state:
 
 The immediate user is the maintainer/operator deploying Meccha Chameleon to a VPS.
 
-The narrowest valuable version is a staging deploy where a push to `main` can produce a versioned release artifact, install it on the VPS, atomically switch the active release, restart `meccha-chameleon-staging.service`, and verify `https://meccha-staging.amfbss.com/api/health`.
+The narrowest valuable version is a staging deploy where a push to `main` can produce a versioned release artifact, install it on the VPS, atomically switch the active release, restart `meccha-chameleon-staging.service`, and verify `https://staging.meccha.fun/api/health`.
 
 That is enough to support:
 
@@ -199,7 +199,7 @@ Suggested service contract:
 
 Suggested Nginx contract:
 
-- `server_name meccha-staging.amfbss.com`
+- `server_name staging.meccha.fun`
 - proxy app traffic to `127.0.0.1:4201`
 - serve public clue media from `/srv/meccha-chameleon-staging/media/public/`
 - do not expose `/srv/meccha-chameleon-staging/media/private/`
@@ -208,7 +208,7 @@ Suggested Nginx contract:
 
 Suggested Cloudflare contract:
 
-- proxied DNS record for `meccha-staging.amfbss.com`
+- proxied DNS record for `staging.meccha.fun`
 - SSL/TLS mode: Full (strict) once origin certificate is installed
 - Always Use HTTPS enabled
 - private media paths must not be cacheable
@@ -219,14 +219,14 @@ Suggested Cloudflare contract:
 - Should staging deploy on every push to `main`, or only after CI passes on `main`?
 - Should the GitHub Actions deploy job build on GitHub and upload artifacts, or SSH to the VPS and build there? Recommendation: build on GitHub, deploy artifacts.
 - Which Linux user owns release files and media directories? Recommendation: `deploy` owns release/media directories; systemd runs the app as a least-privileged app user if available.
-- Is Cloudflare already authoritative for `amfbss.com`, and is an origin certificate already installed on the VPS?
+- Is Cloudflare already authoritative for `meccha.fun`, and is an origin certificate already installed on the VPS?
 - Should staging use a separate Supabase project immediately, or can it start with a test/staging project already configured? Recommendation: separate Supabase staging project before any GPS/media submission flow is tested.
 
 ## Success Criteria
 
 - `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` pass in CI before deploy.
 - GitHub Actions can deploy staging from `main` without manual SSH commands.
-- `https://meccha-staging.amfbss.com/api/health` returns `200` with no secret values.
+- `https://staging.meccha.fun/api/health` returns `200` with no secret values.
 - The systemd service is enabled, running, and bound only to localhost port `4201`.
 - Nginx serves the app over HTTPS and proxies to `127.0.0.1:4201`.
 - Public staging media directory exists and is static-servable.
@@ -249,7 +249,7 @@ Distribution path:
 6. Install script ensures persistent media directories exist under `/srv/meccha-chameleon-staging/media/`.
 7. Install script updates `current` symlink atomically.
 8. systemd restarts `meccha-chameleon-staging.service`.
-9. Workflow verifies `https://meccha-staging.amfbss.com/api/health`.
+9. Workflow verifies `https://staging.meccha.fun/api/health`.
 
 Secrets live in GitHub Actions secrets and on the VPS environment file, not in the artifact:
 
@@ -270,7 +270,7 @@ Secrets live in GitHub Actions secrets and on the VPS environment file, not in t
 - VPS user and SSH key configured for non-interactive deploys.
 - Node.js runtime version on VPS compatible with the version used by CI.
 - Nginx installed and able to reload via a controlled deploy command or documented manual setup.
-- Cloudflare DNS for `amfbss.com` available to create `meccha-staging.amfbss.com`.
+- Cloudflare will manage `meccha.fun` DNS (not amfbss.com).
 - Staging Supabase project and OAuth redirect URLs configured for the staging hostname.
 - `.env.production` created on the VPS with staging-only values.
 
@@ -279,7 +279,7 @@ Secrets live in GitHub Actions secrets and on the VPS environment file, not in t
 Before implementation, confirm the server facts that cannot be inferred from the repo:
 
 - VPS hostname/IP and deploy username.
-- Whether Cloudflare already manages `amfbss.com`.
+- Whether Cloudflare manages `meccha.fun` DNS.
 - Whether the VPS already has Nginx and Node.js installed.
 - Whether staging has its own Supabase project and GitHub OAuth callback URL.
 - Whether deploy should be automatic on `main` or manually dispatched from GitHub Actions.
