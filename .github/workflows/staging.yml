@@ -50,7 +50,7 @@ jobs:
           tar -czf meccha-staging-${{ github.sha }}.tar.gz -C release-package .
 
       - name: Transfer to VPS
-        uses: appleboy/scp-action@v0.1.4
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: deploy
@@ -59,7 +59,7 @@ jobs:
           target: /tmp/
 
       - name: Deploy on VPS
-        uses: appleboy/ssh-action@v0.1.11
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: deploy
