@@ -66,6 +66,7 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
             set -e
+            export PATH="/home/deploy/.nvm/versions/node/v22.22.2/bin:$PATH"
             RELEASE_SHA="${{ github.sha }}"
             RELEASE_DIR="/opt/meccha-chameleon/staging/releases/$RELEASE_SHA"
             mkdir -p "$RELEASE_DIR"
