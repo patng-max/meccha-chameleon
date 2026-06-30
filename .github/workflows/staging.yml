@@ -85,7 +85,7 @@ jobs:
             # Health check (5 retries, 5s apart)
             for i in 1 2 3 4 5; do
               sleep 5
-              if curl -sf http://127.0.0.1:4201/api/health | grep -q '"status":"healthy"'; then
+              if curl -sf http://127.0.0.1:4201/api/health 2>&1 | grep -q '"status":"healthy"'; then
                 echo "Health check passed (attempt $i)"
                 exit 0
               fi

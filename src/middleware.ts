@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const protectedRoutePrefixes = ["/api", "/dashboard", "/onboarding"];
+const publicApiRoutes = ["/api/health"];
 
 async function verifyTurnstile(request: NextRequest) {
   if (request.method !== "POST") {
@@ -76,9 +77,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isPublicApiRoute = publicApiRoutes.some((route) =>
+    request.nextUrl.pathname === route,
+  );
+
   const isProtectedRoute = protectedRoutePrefixes.some((prefix) =>
     request.nextUrl.pathname.startsWith(prefix),
-  );
+  ) && !isPublicApiRoute;
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();

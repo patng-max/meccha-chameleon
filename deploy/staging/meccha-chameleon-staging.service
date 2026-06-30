@@ -10,7 +10,7 @@ Group=deploy
 WorkingDirectory=/opt/meccha-chameleon/staging/current
 EnvironmentFile=/opt/meccha-chameleon/staging/shared/.env.production
 ExecStartPre=+/bin/sleep 2
-ExecStart=/home/deploy/.nvm/versions/node/v22.22.2/bin/node node_modules/.bin/next start
+ExecStart=/home/deploy/.nvm/versions/node/v22.22.2/bin/node .next/standalone/server.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -19,8 +19,8 @@ SyslogIdentifier=meccha-staging
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/meccha-chameleon/staging/current /srv/meccha-chameleon-staging
+ProtectHome=read-only
+ReadWritePaths=/opt/meccha-chameleon/staging/current /srv/meccha-chameleon-staging /opt/meccha-chameleon/staging/releases
 
 [Install]
 WantedBy=multi-user.target
