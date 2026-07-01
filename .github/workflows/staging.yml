@@ -72,7 +72,7 @@ jobs:
             mkdir -p "$RELEASE_DIR"
             tar -xzf /tmp/meccha-staging-$RELEASE_SHA.tar.gz -C "$RELEASE_DIR"
             cd "$RELEASE_DIR"
-            /home/deploy/.nvm/versions/node/v22.22.2/bin/npm ci --omit=dev --silent
+            /home/deploy/.nvm/versions/node/v22.22.2/bin/npm ci --silent
             # Build standalone output on VPS (CI build artifacts not in tarball — .next/ is gitignored)
             /home/deploy/.nvm/versions/node/v22.22.2/bin/node node_modules/.bin/next build
             # Fix Next.js standalone static path: server.js resolves .next/static relative to
