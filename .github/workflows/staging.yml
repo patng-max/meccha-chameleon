@@ -66,14 +66,11 @@ jobs:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: deploy
           key: ${{ secrets.STAGING_SSH_KEY }}
-          env:
-            NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
           script: |
             set -e
             export PATH="/home/deploy/.nvm/versions/node/v22.22.2/bin:$PATH"
-            export NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL"
-            export NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            export NEXT_PUBLIC_SUPABASE_URL="${{ vars.STAGING_SUPABASE_URL }}"
+            export NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ vars.STAGING_SUPABASE_ANON_KEY }}"
             RELEASE_SHA="${{ github.sha }}"
             RELEASE_DIR="/opt/meccha-chameleon/staging/releases/$RELEASE_SHA"
             mkdir -p "$RELEASE_DIR"
