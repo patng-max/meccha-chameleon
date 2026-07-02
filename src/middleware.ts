@@ -9,6 +9,11 @@ async function verifyTurnstile(request: NextRequest) {
     return true;
   }
 
+  // Explicit flag to disable Turnstile — checked before any key presence
+  if (process.env.TURNSTILE_ENABLED === "false") {
+    return true;
+  }
+
   const secret = process.env.TURNSTILE_SECRET_KEY;
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 

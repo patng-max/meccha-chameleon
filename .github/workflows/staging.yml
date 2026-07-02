@@ -77,10 +77,12 @@ jobs:
             tar -xzf /tmp/meccha-staging-$RELEASE_SHA.tar.gz -C "$RELEASE_DIR"
             cd "$RELEASE_DIR"
             # Write env file so next build has the vars (standalone output bundles them at build time)
-            printf '%s\n%s\n%s\n' \
+            printf '%s\n%s\n%s\n%s\n%s\n' \
               "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" \
               "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
               "SITE_URL=https://staging.meccha.fun" \
+              "TURNSTILE_ENABLED=false" \
+              "NEXT_PUBLIC_TURNSTILE_ENABLED=false" \
               > .env.production
             /home/deploy/.nvm/versions/node/v22.22.2/bin/npm ci --silent
             # Build standalone output on VPS (CI build artifacts not in tarball — .next/ is gitignored)

@@ -10,6 +10,11 @@ export type OnboardState = {
 };
 
 async function verifyTurnstile(token: string | null | undefined): Promise<boolean> {
+  // Explicit flag to disable Turnstile — checked before any key presence
+  if (process.env.TURNSTILE_ENABLED === "false") {
+    return true;
+  }
+
   if (!token) return false;
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
