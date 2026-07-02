@@ -61,7 +61,6 @@ function sanitizeError(err: unknown): Record<string, unknown> {
     // Strip any field that looks like a secret or token
     const sanitized: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(err as Record<string, unknown>)) {
-      const key = k.toLowerCase();
       const isSecret =
         /token|secret|key|auth|password|code|cookie|credential/i.test(k) &&
         typeof v === "string" &&

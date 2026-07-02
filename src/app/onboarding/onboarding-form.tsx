@@ -2,9 +2,27 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { onboardAction, type OnboardState } from "./actions";
-import type { Faction, FactionId } from "@lib/game-data";
+import type { Faction, FactionId } from "@/lib/game-data";
 import styles from "./onboarding.module.css";
 import React, { useEffect, useRef } from "react";
+
+// Cloudflare Turnstile widget type
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "expired-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+        },
+      ) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
 
 const initialState: OnboardState = {};
 
