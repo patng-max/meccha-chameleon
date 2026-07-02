@@ -100,8 +100,9 @@ jobs:
             ln -s "$RELEASE_DIR" /opt/meccha-chameleon/staging/current
             # Fix nginx proxy buffer size for large Set-Cookie headers from Supabase auth
             # (proxy_buffer_size default 4K is too small for auth responses with tokens)
+            # Using awk because GNU sed \n interpretation is shell-version-dependent
             if ! grep -q "proxy_buffer_size 128k" /etc/nginx/sites-available/meccha-chameleon-staging; then
-              sudo sed -i '/proxy_read_timeout 86400;/a\        proxy_buffer_size 128k;\n        proxy_buffers 8 256k;\n        proxy_busy_buffers_size 256k;' /etc/nginx/sites-available/meccha-chameleon-staging
+              sudo awk '/proxy_read_timeout 86400;/ { print; print "        proxy_buffer_size 128k;"; print "        proxy_buffers 8 256k;"; print "        proxy_busy_buffers_size 256k;"; next } 1' /etc/nginx/sites-available/meccha-chameleon-staging > /tmp/meccha-nginx-new && sudo mv /tmp/meccha-nginx-new /etc/nginx/sites-available/meccha-chameleon-staging
               sudo nginx -t && sudo nginx -s reload
             fi
             # Restart systemd service

@@ -20,9 +20,33 @@
 
 | Role | Responsibility |
 |------|---------------|
-| **Arch** (main agent) | Owns Git, GitHub, commits, pushes, deployment, verification. Spawns subagents. Receives reports. |
+| **Arch** (main agent) | Owns Git, GitHub, commits, pushes, deployment, VPS configuration, environment variables, Nginx/systemd, and production verification. Spawns subagents. Receives reports. |
 | **Subagent** (spawned task agent) | Executes a specific task within a defined scope. Reports evidence to Arch. Does not commit. |
 | **Codex CLI** | Non-interactive planning and implementation tool. Invoked by Subagent via `codex exec`. |
+
+### Mandatory process for all code, workflow, and test changes
+
+> **Rule:** All repository code, workflow, middleware, server-action, Next.js configuration, and test changes MUST go through the Subagent → Codex CLI path. No direct implementation in the repository.
+
+**Required workflow for every change:**
+1. Subagent calls `codex exec /office-hours "<goal>" --sandbox workspace-write`
+2. `codex exec /plan-ceo-review "<goal>" --sandbox workspace-write`
+3. `codex exec /plan-eng-review "<goal>" --sandbox workspace-write`
+4. Implementation via `codex exec "Implement <feature>. Details: <spec>" --sandbox workspace-write`
+5. `codex exec /review "<scope>" --sandbox workspace-write`
+6. `codex exec /qa "<scope>" --sandbox workspace-write`
+7. `codex exec /ship "<summary>" --sandbox workspace-write`
+8. Subagent reports evidence to Arch
+9. **Arch commits all resulting docs and code to GitHub** (Subagent never commits)
+
+**Arch owns these directly (no Codex required):**
+- Git operations (commit, push, merge, PR management)
+- VPS configuration (Nginx, systemd environment files, environment variables)
+- GitHub Actions workflow dispatches and reruns
+- Production/staging verification and smoke testing
+- Emergency mitigations (apply immediately, then represent through Codex for the canonical record)
+
+**Note on emergency mitigations:** If Arch applies a live fix to the VPS (e.g., nginx config) without Codex, Arch must represent that fix in the repository's canonical deployment configuration immediately after, so it survives future deploys. The workflow file is the canonical record — direct VPS changes without corresponding workflow updates will be overwritten on the next deploy.
 
 ### Rules
 
