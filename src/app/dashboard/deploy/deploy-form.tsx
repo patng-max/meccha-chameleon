@@ -403,6 +403,27 @@ export function DeployForm({
         </div>
       </fieldset>
 
+      {/* Clue text */}
+      <div className={styles.field}>
+        <label htmlFor="clue_text" className={styles.fieldLabel}>
+          Clue text <span className={styles.required}>*</span>
+        </label>
+        <p className={styles.fieldHint}>
+          10–500 characters. Private while pending; public after approval. Give seekers
+          enough to find the hide without making it trivial.
+        </p>
+        <textarea
+          id="clue_text"
+          name="clue_text"
+          className={styles.textInput}
+          placeholder="e.g. &quot;Behind the stone lion facing the old library, on the third stone from the left.&quot;"
+          minLength={10}
+          maxLength={500}
+          rows={3}
+          required
+        />
+      </div>
+
       {/* Safety checklist */}
       <fieldset className={styles.fieldGroup}>
         <legend className={styles.fieldLabel}>

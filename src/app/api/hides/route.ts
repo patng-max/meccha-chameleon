@@ -2,13 +2,14 @@ import { createServerAnonClient, createServiceRoleClient } from "@/lib/supabase/
 import { NextResponse } from "next/server";
 import { stripImageExif } from "@/lib/exif-strip";
 import { latLngToCell } from "@/lib/h3-utils";
-import { writeFile } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
-const MEDIA_BASE = process.env.MEDIA_BASE_DIR ?? "/srv/meccha-chameleon-staging/media";
-const CLUES_DIR = join(MEDIA_BASE, "private", "clues");
+const MEDIA_BASE =
+  process.env.MEDIA_BASE_DIR ?? "/srv/meccha-chameleon-staging/media";
+const PRIVATE_CLUES_DIR = join(MEDIA_BASE, "private", "clues");
 const PROOFS_DIR = join(MEDIA_BASE, "private", "proofs");
 
 const READING_LAT_MIN = 51.4;
@@ -25,9 +26,18 @@ const SAFETY_CHECKLIST_KEYS = [
   "noUnsafeImagery",
 ] as const;
 
+const MAX_SUBMISSIONS_PER_HOUR = 3;
+
 const submitHideSchema = z.object({
-  exact_lat: z.coerce.number().min(READING_LAT_MIN).max(READING_LAT_MAX),
-  exact_lng: z.coerce.number().min(READING_LNG_MIN).max(READING_LNG_MAX),
+  exact_lat: z.coerce
+    .number()
+    .min(READING_LAT_MIN)
+    .max(READING_LAT_MAX),
+  exact_lng: z.coerce
+    .number()
+    .min(READING_LNG_MIN)
+    .max(READING_LNG_MAX),
+  clue_text: z.string().min(10).max(500).trim(),
   broad_area_label: z.string().min(1).max(100).trim(),
   codename: z.string().min(3).max(40).trim(),
   difficulty: z.enum(["easy", "moderate", "challenging"]),
@@ -38,10 +48,78 @@ const submitHideSchema = z.object({
     ),
   ),
   faction_colour_confirmed: z.literal(true),
+  turnstileToken: z.string().optional(),
 });
 
+// ── Rate limiter ────────────────────────────────────────────────────────────────
+async function checkRateLimit(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  playerId: string,
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const { data: rate } = await supabase
+    .from("hide_submission_rate")
+    .select("submissions_last_hour, window_start")
+    .eq("player_id", playerId)
+    .single();
+
+  if (!rate) {
+    // First submission — insert record and allow
+    await supabase
+      .from("hide_submission_rate")
+      .insert({ player_id: playerId, submissions_last_hour: 1, window_start: now });
+    return { allowed: true };
+  }
+
+  // Reset window if expired
+  if (new Date(rate.window_start) < windowStart) {
+    await supabase
+      .from("hide_submission_rate")
+      .update({ submissions_last_hour: 1, window_start: now })
+      .eq("player_id", playerId);
+    return { allowed: true };
+  }
+
+  // Within window — check count
+  if (rate.submissions_last_hour >= MAX_SUBMISSIONS_PER_HOUR) {
+    const resetAt = new Date(
+      new Date(rate.window_start).getTime() + 60 * 60 * 1000,
+    );
+    return { allowed: false, retryAfter: Math.ceil((resetAt.getTime() - now.getTime()) / 1000) };
+  }
+
+  await supabase
+    .from("hide_submission_rate")
+    .update({ submissions_last_hour: rate.submissions_last_hour + 1 })
+    .eq("player_id", playerId);
+  return { allowed: true };
+}
+
+// ── Turnstile verifier (inline — avoids importing server action) ────────────────
+async function verifyTurnstile(token: string | null): Promise<boolean> {
+  if (process.env.TURNSTILE_ENABLED === "false") {
+    return true;
+  }
+  if (!token) return false;
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    return process.env.NODE_ENV !== "production";
+  }
+  const formData = new FormData();
+  formData.set("secret", secret);
+  formData.set("response", token);
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    body: formData,
+  });
+  const result = (await res.json()) as { success?: boolean };
+  return Boolean(result.success);
+}
+
 export async function POST(request: Request) {
-  // ── Auth ──────────────────────────────────────────────────────────────────────
+  // ── Auth ───────────────────────────────────────────────────────────────────
   const anonClient = await createServerAnonClient();
   const {
     data: { user },
@@ -50,7 +128,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ── Onboarded player check ───────────────────────────────────────────────────
+  // ── Onboarded player check ─────────────────────────────────────────────────
   const { data: player, error: playerError } = await anonClient
     .from("players")
     .select("id, faction")
@@ -58,13 +136,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (playerError || !player) {
-    return NextResponse.json(
-      { error: "Player not onboarded" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Player not onboarded" }, { status: 403 });
   }
 
-  // ── Parse FormData ───────────────────────────────────────────────────────────
+  // ── Parse FormData ─────────────────────────────────────────────────────────
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -76,6 +151,7 @@ export async function POST(request: Request) {
   const cluePhoto = formData.get("clue_photo");
   const raw_lat = formData.get("exact_lat");
   const raw_lng = formData.get("exact_lng");
+  const clue_text = formData.get("clue_text");
   const broad_area_label = formData.get("broad_area_label");
   const codename = formData.get("codename");
   const difficulty = formData.get("difficulty");
@@ -86,8 +162,9 @@ export async function POST(request: Request) {
   const safety_safePublicAccess = formData.get("safety_safePublicAccess");
   const safety_noPII = formData.get("safety_noPII");
   const safety_noUnsafeImagery = formData.get("safety_noUnsafeImagery");
+  const turnstileToken = formData.get("turnstileToken");
 
-  // Validate photos
+  // ── Photo validation ────────────────────────────────────────────────────────
   if (!identityPhoto || !(identityPhoto instanceof File)) {
     return NextResponse.json({ error: "Identity photo is required" }, { status: 400 });
   }
@@ -108,7 +185,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Image must be under 10 MB" }, { status: 400 });
   }
 
-  // Validate safety checklist
+  // ── Safety checklist ────────────────────────────────────────────────────────
   const safety_declaration = {
     noTrespass: safety_noTrespass === "true",
     noDangerousLocation: safety_noDangerousLocation === "true",
@@ -126,15 +203,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate schema fields
+  // ── Schema validation ───────────────────────────────────────────────────────
   const parsed = submitHideSchema.safeParse({
     exact_lat: raw_lat,
     exact_lng: raw_lng,
+    clue_text,
     broad_area_label,
     codename,
     difficulty,
     safety_declaration,
     faction_colour_confirmed: faction_colour_confirmed === "true",
+    turnstileToken: turnstileToken instanceof File ? undefined : turnstileToken,
   });
 
   if (!parsed.success) {
@@ -144,9 +223,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const { exact_lat, exact_lng } = parsed.data;
+  // ── Turnstile (when enabled) ────────────────────────────────────────────────
+  const turnstileValid = await verifyTurnstile(
+    typeof turnstileToken === "string" ? turnstileToken : null,
+  );
+  if (!turnstileValid) {
+    return NextResponse.json(
+      { error: "Turnstile verification failed. Please try again." },
+      { status: 403 },
+    );
+  }
 
-  // ── Sanitise photos ───────────────────────────────────────────────────────────
+  // ── Rate limit ──────────────────────────────────────────────────────────────
+  const serviceClient = createServiceRoleClient();
+  const rateCheck = await checkRateLimit(serviceClient, player.id);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        error: "Too many submissions. Please wait before submitting another hide.",
+        retryAfter: rateCheck.retryAfter,
+      },
+      { status: 429 },
+    );
+  }
+
+  const { exact_lat, exact_lng, clue_text: validatedClueText } = parsed.data;
+
+  // ── Sanitise photos ────────────────────────────────────────────────────────
   let identityBuffer: ArrayBuffer;
   let clueBuffer: ArrayBuffer;
   try {
@@ -159,30 +262,39 @@ export async function POST(request: Request) {
       stripImageExif(clueRaw),
     ]);
   } catch {
-    return NextResponse.json(
-      { error: "Failed to process images" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to process images" }, { status: 500 });
   }
 
-  // ── H3 computation (server-side) ─────────────────────────────────────────────
+  // ── H3 computation (server-side) ────────────────────────────────────────────
   const h3_public_cell = latLngToCell(exact_lat, exact_lng, 7);
 
-  // ── File paths ────────────────────────────────────────────────────────────────
+  // ── Generate media paths ────────────────────────────────────────────────────
   const clueUuid = randomUUID();
   const proofUuid = randomUUID();
-  const cluePath = join(CLUES_DIR, `${clueUuid}.jpg`);
+  const cluePath = join(PRIVATE_CLUES_DIR, `${clueUuid}.jpg`);
   const proofPath = join(PROOFS_DIR, `${proofUuid}.jpg`);
+  // Private URLs — not publicly accessible
+  const privateClueUrl = `/media/private/clues/${clueUuid}.jpg`;
+  const privateProofUrl = `/media/private/proofs/${proofUuid}.jpg`;
 
-  // ── DB insert via service role ───────────────────────────────────────────────
-  const serviceClient = createServiceRoleClient();
+  // ── Write sanitised files FIRST ─────────────────────────────────────────────
+  // If file write fails, there is nothing to clean up (no DB records yet).
+  // If DB insert fails below, we clean up both files.
+  try {
+    await Promise.all([
+      writeFile(cluePath, Buffer.from(clueBuffer)),
+      writeFile(proofPath, Buffer.from(identityBuffer)),
+    ]);
+  } catch (fileErr) {
+    console.error("[M4] File write failed:", fileErr);
+    return NextResponse.json({ error: "Failed to save images" }, { status: 500 });
+  }
 
+  // ── DB insert via service role ─────────────────────────────────────────────
+  // Faction is server-authoritative — read from DB player.faction, never from client.
   let hideRecord: { id: string; mc_id: string } | null = null;
 
   try {
-    // Transaction: insert private_hide_locations + public_hides
-    // We do this as two separate inserts (Supabase transactions via rpc if needed,
-    // but here we rely on the service role RLS bypass)
     const { data: privLoc, error: privError } = await serviceClient
       .from("private_hide_locations")
       .insert({
@@ -194,10 +306,12 @@ export async function POST(request: Request) {
       .single();
 
     if (privError || !privLoc) {
-      return NextResponse.json(
-        { error: "Failed to record location" },
-        { status: 500 },
-      );
+      // DB failure — clean up already-written files
+      await Promise.all([
+        unlink(cluePath).catch(() => {}),
+        unlink(proofPath).catch(() => {}),
+      ]).catch(() => {});
+      return NextResponse.json({ error: "Failed to record location" }, { status: 500 });
     }
 
     const { data: pubHide, error: pubError } = await serviceClient
@@ -205,55 +319,47 @@ export async function POST(request: Request) {
       .insert({
         private_location_id: privLoc.id,
         player_id: player.id,
-        faction: player.faction, // Server-authoritative — from DB
+        faction: player.faction,
         h3_public_cell,
         codename: parsed.data.codename,
+        clue_text: validatedClueText,
         difficulty: parsed.data.difficulty,
         broad_area_label: parsed.data.broad_area_label,
         faction_colour_confirmed: true,
         safety_declaration,
         status: "awaiting_moderation",
-        identity_photo_url: `/media/private/proofs/${proofUuid}.jpg`,
-        clue_photo_url: `/media/private/clues/${clueUuid}.jpg`,
-        clue_text: "(pending moderation)",
+        identity_photo_url: privateProofUrl,
+        clue_photo_url: privateClueUrl,
         approximate_area_label: parsed.data.broad_area_label,
       })
       .select("id, mc_id")
       .single();
 
     if (pubError || !pubHide) {
-      // Rollback private location
-      await serviceClient
-        .from("private_hide_locations")
-        .delete()
-        .eq("id", privLoc.id);
-      return NextResponse.json(
-        { error: "Failed to create hide record" },
-        { status: 500 },
-      );
+      // DB failure — clean up both private_location AND already-written files
+      await Promise.all([
+        (async () => {
+          try {
+            await serviceClient
+              .from("private_hide_locations")
+              .delete()
+              .eq("id", privLoc.id);
+          } catch {}
+        })(),
+        unlink(cluePath).catch(() => {}),
+        unlink(proofPath).catch(() => {}),
+      ]);
+      return NextResponse.json({ error: "Failed to create hide record" }, { status: 500 });
     }
 
     hideRecord = pubHide;
   } catch {
-    return NextResponse.json({ error: "Database error" }, { status: 500 });
-  }
-
-  // ── Write sanitised files (after DB success) ─────────────────────────────────
-  try {
+    // Unexpected error — clean up files
     await Promise.all([
-      writeFile(cluePath, Buffer.from(clueBuffer)),
-      writeFile(proofPath, Buffer.from(identityBuffer)),
-    ]);
-  } catch (fileErr) {
-    // Best-effort cleanup of DB records if file write fails
-    console.error("[M4] File write failed, rolling back DB records:", fileErr);
-    try {
-      await serviceClient.from("public_hides").delete().eq("id", hideRecord!.id);
-    } catch {}
-    return NextResponse.json(
-      { error: "Failed to save images" },
-      { status: 500 },
-    );
+      unlink(cluePath).catch(() => {}),
+      unlink(proofPath).catch(() => {}),
+    ]).catch(() => {});
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
   }
 
   return NextResponse.json(

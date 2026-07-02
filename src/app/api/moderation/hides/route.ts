@@ -31,7 +31,7 @@ export async function GET() {
   const { data: hides, error } = await supabase
     .from("public_hides")
     .select(
-      "id, mc_id, h3_public_cell, broad_area_label, codename, difficulty, submitted_by, created_at, identity_photo_url, clue_photo_url, safety_declaration, faction_colour_confirmed",
+      "id, mc_id, h3_public_cell, broad_area_label, codename, clue_text, difficulty, submitted_by, created_at, identity_photo_url, clue_photo_url, safety_declaration, faction_colour_confirmed",
     )
     .eq("status", "awaiting_moderation")
     .order("created_at", { ascending: true }); // oldest first
@@ -46,6 +46,7 @@ export async function GET() {
     h3PublicCell: h.h3_public_cell,
     broadAreaLabel: h.broad_area_label,
     codename: h.codename,
+    clueText: h.clue_text,
     difficulty: h.difficulty,
     submittedAt: h.created_at,
     playerId: h.submitted_by,

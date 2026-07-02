@@ -1,10 +1,11 @@
 import { createServerAnonClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { copyFile, unlink } from "fs/promises";
+import { copyFile, unlink, access, constants } from "fs/promises";
 import { join } from "path";
 import { z } from "zod";
 
-const MEDIA_BASE = process.env.MEDIA_BASE_DIR ?? "/srv/meccha-chameleon-staging/media";
+const MEDIA_BASE =
+  process.env.MEDIA_BASE_DIR ?? "/srv/meccha-chameleon-staging/media";
 const PRIVATE_CLUES_DIR = join(MEDIA_BASE, "private", "clues");
 const PUBLIC_CLUES_DIR = join(MEDIA_BASE, "public", "clues");
 
@@ -13,14 +14,19 @@ const actionSchema = z.object({
   reason: z.string().optional(),
 });
 
+// ── Territory projection ──────────────────────────────────────────────────────
+// Called after every hide state change.  Determines whether to write a
+// territory_cells upsert and/or a territory_event, based on whether the
+// material territory state has actually changed.
 async function projectTerritoryForCell(
   h3Cell: string,
   supabase: ReturnType<typeof createServiceRoleClient>,
+  triggeringHideId: string,
 ) {
-  // Count live hides per faction in this cell
+  // 1. Derive current state from live approved hides only
   const { data: liveHides } = await supabase
     .from("public_hides")
-    .select("faction")
+    .select("faction, h3_public_cell")
     .eq("h3_public_cell", h3Cell)
     .eq("status", "live");
 
@@ -29,31 +35,39 @@ async function projectTerritoryForCell(
     counts[h.faction] = (counts[h.faction] ?? 0) + 1;
   }
 
-  let state: "unclaimed" | "controlled" | "contested";
-  let controllerFaction: string | null;
+  const factionEntries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const totalActive = Object.values(counts).reduce((s, n) => s + n, 0);
 
-  const factionEntries = Object.entries(counts);
+  let newState: "unclaimed" | "controlled" | "contested";
+  let newController: string | null;
+
   if (factionEntries.length === 0) {
-    state = "unclaimed";
-    controllerFaction = null;
+    newState = "unclaimed";
+    newController = null;
   } else if (factionEntries.length === 1) {
-    state = "controlled";
-    controllerFaction = factionEntries[0][0];
+    newState = "controlled";
+    newController = factionEntries[0][0];
   } else {
-    // 2+ factions — contested, majority wins (null if tied)
-    factionEntries.sort((a, b) => b[1] - a[1]);
-    const topCount = factionEntries[0][1];
-    const secondCount = factionEntries[1]?.[1] ?? 0;
-    if (topCount === secondCount) {
-      state = "contested";
-      controllerFaction = null;
+    newState = "contested";
+    // Tie → contested with no clear controller
+    if (factionEntries[0][1] === factionEntries[1][1]) {
+      newController = null;
     } else {
-      state = "contested";
-      controllerFaction = factionEntries[0][0];
+      newController = factionEntries[0][0];
     }
   }
 
-  // Get area_label from first live hide in cell (or keep existing)
+  // 2. Fetch existing territory record to detect actual state change
+  const { data: existing } = await supabase
+    .from("territory_cells")
+    .select("state, controller_faction")
+    .eq("h3_cell", h3Cell)
+    .maybeSingle();
+
+  const priorState: string = existing?.state ?? "unclaimed";
+  const priorController: string | null = existing?.controller_faction ?? null;
+
+  // 3. Determine area label from first live hide in cell
   const { data: firstHide } = await supabase
     .from("public_hides")
     .select("broad_area_label")
@@ -64,21 +78,44 @@ async function projectTerritoryForCell(
 
   const areaLabel = firstHide?.broad_area_label ?? h3Cell;
 
-  // Upsert territory_cells
-  await supabase
-    .from("territory_cells")
-    .upsert(
-      { h3_cell: h3Cell, area_label: areaLabel, state, controller_faction: controllerFaction },
-      { onConflict: "h3_cell" },
-    );
+  // 4. Upsert territory_cells only if something materially changed
+  const stateChanged =
+    priorState !== newState || priorController !== newController;
 
-  // Insert territory_events
-  await supabase.from("territory_events").insert({
-    h3_cell: h3Cell,
-    event_type: "hide_approved",
-    territory_state: state,
-    faction: controllerFaction as "verdant" | "ember" | "tide" | null,
-  });
+  if (stateChanged) {
+    await supabase
+      .from("territory_cells")
+      .upsert(
+        {
+          h3_cell: h3Cell,
+          area_label: areaLabel,
+          state: newState,
+          controller_faction: newController,
+          active_hide_count: totalActive,
+          contested_hide_count:
+            newState === "contested" ? factionEntries.length : 0,
+        },
+        { onConflict: "h3_cell" },
+      );
+
+    // 5. Record a state-change event only when territory state changes
+    await supabase.from("territory_events").insert({
+      h3_cell: h3Cell,
+      event_type: "territory_state_change",
+      territory_state: newState,
+      faction: newController as "verdant" | "ember" | "tide" | null,
+      hide_id: triggeringHideId,
+    });
+  } else {
+    // 5-alt. No state change — record a hide-approval event (no state mutation)
+    await supabase.from("territory_events").insert({
+      h3_cell: h3Cell,
+      event_type: "hide_approved",
+      territory_state: newState,
+      faction: newController as "verdant" | "ember" | "tide" | null,
+      hide_id: triggeringHideId,
+    });
+  }
 }
 
 export async function POST(
@@ -87,7 +124,7 @@ export async function POST(
 ) {
   const { id: hideId } = await params;
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
+  // ── Auth: player + moderator ───────────────────────────────────────────────
   const anonClient = await createServerAnonClient();
   const {
     data: { user },
@@ -96,7 +133,6 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check player + moderator status
   const { data: player } = await anonClient
     .from("players")
     .select("id")
@@ -112,7 +148,7 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // ── Parse action ─────────────────────────────────────────────────────────────
+  // ── Parse + validate action ────────────────────────────────────────────────
   let body: unknown;
   try {
     body = await request.json();
@@ -137,57 +173,96 @@ export async function POST(
     );
   }
 
-  // ── Load hide ────────────────────────────────────────────────────────────────
+  // ── Load hide ───────────────────────────────────────────────────────────────
   const serviceClient = createServiceRoleClient();
 
-  const { data: hide, error: hideError } = await serviceClient
+  const { data: hide } = await serviceClient
     .from("public_hides")
-    .select("id, status, clue_photo_url, h3_public_cell")
+    .select(
+      "id, status, clue_photo_url, h3_public_cell, broad_area_label, clue_text",
+    )
     .eq("id", hideId)
     .maybeSingle();
 
-  if (hideError || !hide) {
+  if (!hide) {
     return NextResponse.json({ error: "Hide not found" }, { status: 404 });
   }
 
   if (hide.status !== "awaiting_moderation") {
-    // Idempotent: if already processed, return success
+    // Idempotent — already processed
     return NextResponse.json({ success: true, status: hide.status });
   }
 
   // ── Execute action ────────────────────────────────────────────────────────────
   if (action === "approve") {
-    // 1. Promote clue photo: private/clues/{uuid}.jpg → public/clues/{uuid}.jpg
-    if (hide.clue_photo_url) {
-      const uuid = hide.clue_photo_url.split("/").pop()?.replace(".jpg", "");
-      if (uuid) {
-        const src = join(PRIVATE_CLUES_DIR, `${uuid}.jpg`);
-        const dst = join(PUBLIC_CLUES_DIR, `${uuid}.jpg`);
-        try {
-          await copyFile(src, dst);
-          await unlink(src).catch(() => {}); // best-effort cleanup
-        } catch {
-          // Non-fatal: file promotion failed but DB update proceeds
-        }
-      }
+    // ── APPROVE: fail-closed on file promotion ──────────────────────────────
+
+    // 1. Identify source (private) clue path
+    const privateUuid = hide.clue_photo_url
+      ? hide.clue_photo_url.split("/").pop()?.replace(".jpg", "")
+      : null;
+
+    if (!hide.clue_photo_url || !privateUuid) {
+      return NextResponse.json(
+        {
+          error:
+            "Clue photo is missing from this hide. Cannot approve without a valid clue image.",
+        },
+        { status: 422 },
+      );
     }
 
-    // 2. Update hide status → live
-    await serviceClient
+    const srcPath = join(PRIVATE_CLUES_DIR, `${privateUuid}.jpg`);
+    const dstPath = join(PUBLIC_CLUES_DIR, `${privateUuid}.jpg`);
+
+    // 2. Copy private → public
+    try {
+      await copyFile(srcPath, dstPath);
+      // 3. Verify the promoted file is readable before proceeding
+      await access(dstPath, constants.R_OK);
+    } catch (promoteErr) {
+      console.error("[M4] Clue promotion failed:", promoteErr);
+      // Fail closed: hide stays in awaiting_moderation, clue stays inaccessible.
+      // Moderator receives an actionable error with the failed file reference.
+      return NextResponse.json(
+        {
+          error:
+            "Clue photo promotion failed. The file may be missing or unreadable. Please re-upload the clue photo and try again.",
+          code: "PROMOTION_FAILED",
+        },
+        { status: 422 },
+      );
+    }
+
+    // 4. Only now update hide to live (promotion verified)
+    const publicClueUrl = hide.clue_photo_url.replace(
+      "/media/private/clues",
+      "/media/public/clues",
+    );
+
+    const { error: updateError } = await serviceClient
       .from("public_hides")
       .update({
         status: "live",
         moderated_at: new Date().toISOString(),
         moderated_by: player.id,
-        clue_text: "Approved",
-        clue_photo_url: hide.clue_photo_url?.replace(
-          "/media/private/clues",
-          "/media/public/clues",
-        ),
+        clue_photo_url: publicClueUrl,
+        // clue_text is already set by the submitter; it stays and is now public
       })
       .eq("id", hideId);
 
-    // 3. Insert moderator_actions
+    if (updateError) {
+      // DB update failed — roll back the promoted file
+      try {
+        await unlink(dstPath);
+      } catch {}
+      return NextResponse.json(
+        { error: "Failed to update hide status. Promotion rolled back." },
+        { status: 500 },
+      );
+    }
+
+    // 5. Write moderator action (append-only)
     await serviceClient.from("moderator_actions").insert({
       moderator_id: player.id,
       action_type: "approve",
@@ -195,8 +270,8 @@ export async function POST(
       target_type: "hide",
     });
 
-    // 4. Territory projection
-    await projectTerritoryForCell(hide.h3_public_cell, serviceClient);
+    // 6. Territory projection (with state-change vs event distinction)
+    await projectTerritoryForCell(hide.h3_public_cell, serviceClient, hideId);
   } else if (action === "reject") {
     await serviceClient
       .from("public_hides")
@@ -215,6 +290,9 @@ export async function POST(
       target_type: "hide",
       notes: reason,
     });
+
+    // Re-projection: this hide is now retired, update territory
+    await projectTerritoryForCell(hide.h3_public_cell, serviceClient, hideId);
   } else if (action === "request-info") {
     await serviceClient
       .from("public_hides")
@@ -232,6 +310,7 @@ export async function POST(
       target_type: "hide",
       notes: reason,
     });
+    // No territory change for request-info
   }
 
   return NextResponse.json({ success: true });
